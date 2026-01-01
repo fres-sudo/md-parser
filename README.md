@@ -97,4 +97,7 @@ Phase 3: Inline Elements & Polish
 
 Immediate Request: Please start with Phase 1. Show me the Cargo.toml dependencies, the AST design, the first test case, and the initial implementation.
 
+### Prompt 4 - Cursor (auto mode)
+
+Go on with phase 2.
 
