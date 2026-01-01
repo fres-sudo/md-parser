@@ -1,6 +1,11 @@
 [package]
 name = "md-parser"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "md_parser"
+path = "src/lib.rs"
 
 [dependencies]
+regex = "1.10"
