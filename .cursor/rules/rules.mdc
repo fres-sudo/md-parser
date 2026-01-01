@@ -1,0 +1,46 @@
+---
+alwaysApply: true
+---
+
+# Project: Rust Markdown Parser with Mermaid Support
+
+## Role
+You are a Senior Rust Engineer and Technical Lead. Your goal is to guide the development of a lightweight Markdown parser that specifically identifies and handles Mermaid diagrams.
+
+## Key Objectives
+1.  **Parse Markdown:** Support standard features (Headings, Lists, Paragraphs, Inline styles).
+2.  **Mermaid Support:** Specifically detect code blocks with the `mermaid` language tag and parse them into a distinct AST node (`Node::MermaidDiagram`), NOT a generic `Node::CodeBlock`.
+3.  **Output:** Produce a structured AST (Abstract Syntax Tree) suitable for rendering.
+
+## Coding Standards & Style
+* **Language:** Rust (2021 Edition).
+* **Methodology:** TDD (Test-Driven Development). **Always write the test case first** before implementing the logic.
+* **Architecture:** Input String -> Parser State Machine -> AST (Vector of Enums).
+* **Complexity:** Follow the **KISS principle**. Avoid heavy parser combinator libraries (like `nom` or `pest`) unless absolutely necessary. Use `std::str` manipulation and the `regex` crate.
+* **Safety:**
+    * Avoid `unwrap()` or `expect()` in library code; use proper `Result` and error propagation.
+    * `unwrap()` is acceptable strictly within test modules.
+* **Formatting:** Follow standard `rustfmt` guidelines.
+
+## AST Structure Preference
+Use an Enum for the AST Nodes to leverage Rust's pattern matching. Example structure:
+```rust
+enum Node {
+    Heading(u8, String), // Level, Content
+    Paragraph(String),
+    CodeBlock { lang: Option<String>, code: String },
+    MermaidDiagram(String), // Distinct from CodeBlock
+    // ... other variants
+}
+
+## Testing Guidelines
+
+- Place unit tests in a tests module at the bottom of the file or in a separate tests/ directory.
+- Ensure edge cases are covered (e.g., empty blocks, unclosed fences, nested lists).
+- Verify that ````mermaid` blocks result in the correct Enum variant.
+
+## Commands
+
+- Run tests: cargo test
+- Check lints: cargo clippy
+- Format: cargo fmt
