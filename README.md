@@ -13,9 +13,9 @@ Create a suite of test Markdown documents (including edge cases) and a small dem
 3. **AI Usage & Verification Report**
 Collect and submit the prompts you used with AI and write a short report explaining how you evaluated, corrected, and verified the AI-generated code (tests, manual inspection, comparison with reference Markdown behaviour).
 
-## Prompts Used
+## Prompts Used
 
- ### Prompt 1 - Google Gemini
+### Prompt 1 - Google Gemini
 
   I need to develop this project for a uni course.
 
@@ -23,11 +23,11 @@ Collect and submit the prompts you used with AI and write a short report explain
 
   I firstly need you to create a very detailed prompt for an LLM in order to guide it in the development of a TDD markdown parser with special support for mermaid in rust. Make sure to guide it to follow the rust best practices focusing on KISS principle and mantainability.
 
- ### Prompt 2 - Google Gemini
+### Prompt 2 - Google Gemini
 
  Can you also create the rules.mdc file for the project?
 
- ### Prompt 3 - Cursor (auto mode - it selects the best model for the task automatically)
+### Prompt 3 - Cursor (auto mode - it selects the best model for the task automatically)
 
  Role: You are a Senior Rust Engineer and Technical Lead. We are building a lightweight, maintainable Markdown parser from scratch for a university project.
 
