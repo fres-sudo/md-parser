@@ -307,6 +307,176 @@ impl Parser {
         let ast = self.parse();
         serde_json::to_string_pretty(&ast).unwrap_or_else(|e| format!("Error serializing: {}", e))
     }
+
+    /// Render inline elements to HTML
+    fn render_inline(&self, inline: &Inline) -> String {
+        match inline {
+            Inline::Text { content } => self.escape_html(content),
+            Inline::Bold { content } => {
+                let inner: String = content.iter().map(|i| self.render_inline(i)).collect();
+                format!("<strong>{}</strong>", inner)
+            }
+            Inline::Italic { content } => {
+                let inner: String = content.iter().map(|i| self.render_inline(i)).collect();
+                format!("<em>{}</em>", inner)
+            }
+            Inline::Link { text, url } => {
+                let link_text: String = text.iter().map(|i| self.render_inline(i)).collect();
+                format!("<a href=\"{}\">{}</a>", self.escape_html(url), link_text)
+            }
+        }
+    }
+
+    /// Escape HTML special characters
+    fn escape_html(&self, text: &str) -> String {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\'', "&#39;")
+    }
+
+    /// Render a single node to HTML
+    fn render_node(&self, node: &Node) -> String {
+        match node {
+            Node::Heading { level, content } => {
+                let inner: String = content.iter().map(|i| self.render_inline(i)).collect();
+                format!("<h{}>{}</h{}>", level, inner, level)
+            }
+            Node::Paragraph { content } => {
+                let inner: String = content.iter().map(|i| self.render_inline(i)).collect();
+                format!("<p>{}</p>", inner)
+            }
+            Node::ListItem { content } => {
+                let inner: String = content.iter().map(|i| self.render_inline(i)).collect();
+                format!("<li>{}</li>", inner)
+            }
+            Node::CodeBlock { lang, code } => {
+                let lang_class = lang.as_ref()
+                    .map(|l| format!(" class=\"language-{}\"", self.escape_html(l)))
+                    .unwrap_or_default();
+                let escaped_code = self.escape_html(code);
+                format!("<pre><code{}>{}</code></pre>", lang_class, escaped_code)
+            }
+            Node::MermaidDiagram { diagram } => {
+                // Use a div with class "mermaid" for Mermaid.js to process
+                let escaped_diagram = self.escape_html(diagram);
+                format!("<div class=\"mermaid\">{}</div>", escaped_diagram)
+            }
+        }
+    }
+
+    /// Generate a complete HTML document from the AST
+    pub fn to_html(&self) -> String {
+        let ast = self.parse();
+        let mut html = String::from(
+            r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Parser Output</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+        h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+        h3 { font-size: 1.25em; }
+        h4 { font-size: 1em; }
+        h5 { font-size: 0.875em; }
+        h6 { font-size: 0.85em; color: #6a737d; }
+        p {
+            margin-bottom: 16px;
+        }
+        strong {
+            font-weight: 600;
+        }
+        em {
+            font-style: italic;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        pre {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+            overflow: auto;
+            margin-bottom: 16px;
+        }
+        code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 85%;
+        }
+        pre code {
+            display: block;
+            padding: 0;
+            margin: 0;
+            overflow: visible;
+            word-wrap: normal;
+            background-color: transparent;
+            border: 0;
+        }
+        .mermaid {
+            margin: 24px 0;
+            text-align: center;
+            background-color: #f6f8fa;
+            padding: 20px;
+            border-radius: 6px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+"#,
+        );
+
+        for node in &ast {
+            html.push_str(&self.render_node(node));
+            html.push('\n');
+        }
+
+        html.push_str(
+            r#"
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>"#,
+        );
+
+        html
+    }
+
+    /// Save the HTML output to a file
+    pub fn to_html_file(&self, filename: &str) -> std::io::Result<()> {
+        use std::fs::File;
+        use std::io::Write;
+        let html = self.to_html();
+        let mut file = File::create(filename)?;
+        file.write_all(html.as_bytes())?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

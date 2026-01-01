@@ -39,4 +39,11 @@ Another paragraph with mixed formatting: **bold** and *italic* and a [link](http
     println!("==========================\n");
     let json = parser.to_json();
     println!("{}", json);
+
+    // Generate HTML file
+    println!("\n\nGenerating HTML file...");
+    match parser.to_html_file("output.html") {
+        Ok(_) => println!("✓ HTML file generated successfully: output.html"),
+        Err(e) => println!("✗ Error generating HTML file: {}", e),
+    }
 }

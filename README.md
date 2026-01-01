@@ -101,3 +101,10 @@ Immediate Request: Please start with Phase 1. Show me the Cargo.toml dependencie
 
 Go on with phase 2.
 
+### Prompt 5 - Cursor (auto mode)
+
+Go on with phase 3.
+
+### Prompt 6 - Cursor (auto mode)
+
+Can you create a function that takes the json formatted AST and output an html  file so i can visualize the output?
