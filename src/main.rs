@@ -1,9 +1,11 @@
 use md_parser::Parser;
 
 fn main() {
-    let markdown = r#"# Phase 2 Demo
+    let markdown = r#"# Phase 3 Demo
 
-This is a paragraph with some text.
+This is a paragraph with **bold text** and *italic text*.
+
+Here's a [link to Rust](https://rust-lang.org) in the text.
 
 ```rust
 fn main() {
@@ -20,16 +22,21 @@ graph TD
     B -->|No| D[Action 2]
 ```
 
-## Subheading
+## Subheading with **Bold** and *Italic*
 
-Another paragraph after the diagram."#;
+Another paragraph with mixed formatting: **bold** and *italic* and a [link](https://example.com)."#;
 
     let parser = Parser::new(markdown.to_string());
     let ast = parser.parse();
 
-    println!("Parsed AST (Phase 2):");
-    println!("=====================\n");
+    println!("Parsed AST (Phase 3 - Debug Format):");
+    println!("====================================\n");
     for (i, node) in ast.iter().enumerate() {
         println!("  {}: {:?}\n", i, node);
     }
+
+    println!("\n\nParsed AST (JSON Format):");
+    println!("==========================\n");
+    let json = parser.to_json();
+    println!("{}", json);
 }
