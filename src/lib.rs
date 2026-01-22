@@ -368,112 +368,47 @@ impl Parser {
 
     /// Generate a complete HTML document from the AST
     pub fn to_html(&self) -> String {
-        let ast = self.parse();
-        let mut html = String::from(
-            r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdown Parser Output</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            color: #333;
-            background-color: #fff;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            margin-top: 24px;
-            margin-bottom: 16px;
-            font-weight: 600;
-            line-height: 1.25;
-        }
-        h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-        h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-        h3 { font-size: 1.25em; }
-        h4 { font-size: 1em; }
-        h5 { font-size: 0.875em; }
-        h6 { font-size: 0.85em; color: #6a737d; }
-        p {
-            margin-bottom: 16px;
-        }
-        strong {
-            font-weight: 600;
-        }
-        em {
-            font-style: italic;
-        }
-        a {
-            color: #0366d6;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        pre {
-            background-color: #f6f8fa;
-            border-radius: 6px;
-            padding: 16px;
-            overflow: auto;
-            margin-bottom: 16px;
-        }
-        code {
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 85%;
-        }
-        pre code {
-            display: block;
-            padding: 0;
-            margin: 0;
-            overflow: visible;
-            word-wrap: normal;
-            background-color: transparent;
-            border: 0;
-        }
-        .mermaid {
-            margin: 24px 0;
-            text-align: center;
-            background-color: #f6f8fa;
-            padding: 20px;
-            border-radius: 6px;
-        }
-        li {
-            margin-bottom: 8px;
-        }
-    </style>
-</head>
-<body>
-"#,
-        );
+        // Load static assets at compile time
+        const HTML_HEADER: &str = include_str!("../assets/html_header.html");
+        const STYLES_CSS: &str = include_str!("../assets/styles.css");
+        const HTML_BODY_START: &str = include_str!("../assets/html_body_start.html");
+        const HTML_FOOTER: &str = include_str!("../assets/html_footer.html");
 
+        let ast = self.parse();
+        let mut html = String::new();
+
+        // Build HTML document from assets
+        html.push_str(HTML_HEADER);
+        html.push_str(STYLES_CSS);
+        html.push_str(HTML_BODY_START);
+
+        // Add rendered nodes
         for node in &ast {
             html.push_str(&self.render_node(node));
             html.push('\n');
         }
 
-        html.push_str(
-            r#"
-    <script>
-        mermaid.initialize({ startOnLoad: true, theme: 'default' });
-    </script>
-</body>
-</html>"#,
-        );
+        // Add footer
+        html.push_str(HTML_FOOTER);
 
         html
     }
 
-    /// Save the HTML output to a file
+    /// Save the HTML output to a file in the output/ directory
     pub fn to_html_file(&self, filename: &str) -> std::io::Result<()> {
-        use std::fs::File;
+        use std::fs::{create_dir_all, File};
         use std::io::Write;
+        use std::path::PathBuf;
+
+        // Create output directory if it doesn't exist
+        let output_dir = PathBuf::from("output");
+        create_dir_all(&output_dir)?;
+
+        // Create the full path to the file
+        let file_path = output_dir.join(filename);
+
         let html = self.to_html();
-        let mut file = File::create(filename)?;
+        let mut file = File::create(&file_path)?;
         file.write_all(html.as_bytes())?;
         Ok(())
     }
