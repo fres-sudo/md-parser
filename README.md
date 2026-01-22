@@ -119,5 +119,45 @@ Can you move all the static assets that are currently beign hardcoded into the r
 
 ### Prompt 9 - Cursor (auto mode)
 
-Can you please ensure that the html output of the program is located in a specific output/ folder?
+Can you ensure that the html output of the program is located in a specific output/ folder?
 
+### Prompt 10 - Cursor (auto mode)
+
+Can you make sure that the program takes a file .md as input instead of an hardcoded string inside the @src/main.rs file?
+
+### Prompt 11 - Cursor (auto mode)
+
+Can you create a cursor rule for rust code styling and best practices?
+
+**Verification**:
+
+- [RustWiki Style Guide](https://rustwiki.org/en/style-guide/)
+- [RustLang Style Guide](https://doc.rust-lang.org/style-guide/)
+
+### Prompt 12 - Cursor (auto mode)
+
+Can you do a refactoring of the @src/lib.rs file and @src/main.rs file ensuring those files (and the ones created if needed) follow the style guidelines defined in @.cursor/rules/rust-style.mdc file.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+
+### Prompt 13 - Cursor (auto mode)
+
+Instead of printing in the terminal can u output other format of the AST as files in the output/ folder?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains the files.
+- Ensuring new tests passes.
+
+### Prompt 14 - Cursor (auto mode)
+
+Can you split up the parsing logic from the rendering logic in @src/lib.rs file?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains the files.
+- Ensuring new tests passes.
