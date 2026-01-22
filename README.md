@@ -237,3 +237,22 @@ Can you add markdown tables in the parser?
 
 ### Prompt 22 - Cursor (auto mode)
 
+Can you organize tests better in differernt files divided by domain?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+
+### Prompt 23 - Cursor (auto mode)
+
+Can u improve the current mermaid implementation by adding:
+
+- Validate Mermaid syntax
+- Support for Mermaid configuration
+- Error handling for invalid Mermaid diagrams (gracefully)
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains the files.
+- Ensuring new tests passes.
