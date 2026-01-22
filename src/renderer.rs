@@ -1,7 +1,8 @@
 //! HTML rendering logic.
 
-use crate::ast::{Alignment, Inline, ListItem, Node};
+use crate::ast::{Alignment, Inline, ListItem, Node, ValidationStatus};
 use crate::config::RendererConfig;
+use serde_json;
 use std::error::Error;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
@@ -32,13 +33,20 @@ fn render_inline(inline: &Inline) -> String {
             let link_text: String = text.iter().map(render_inline).collect();
             format!("<a href=\"{}\">{}</a>", escape_html(url), link_text)
         }
+        Inline::Image { alt, url } => {
+            format!(
+                "<img src=\"{}\" alt=\"{}\" />",
+                escape_html(url),
+                escape_html(alt)
+            )
+        }
     }
 }
 
 /// Render a list item and its nested children recursively
 fn render_list_item(item: &ListItem) -> String {
     let content: String = item.content.iter().map(render_inline).collect();
-    
+
     // Render checkbox for task list items
     let checkbox = if let Some(checked) = item.checked {
         if checked {
@@ -49,7 +57,7 @@ fn render_list_item(item: &ListItem) -> String {
     } else {
         ""
     };
-    
+
     let mut html = format!("<li>{}{}", checkbox, content);
 
     // Render nested children if any
@@ -92,9 +100,76 @@ fn render_node(node: &Node) -> String {
             let escaped_code = escape_html(code);
             format!("<pre><code{}>{}</code></pre>", lang_class, escaped_code)
         }
-        Node::MermaidDiagram { diagram } => {
+        Node::MermaidDiagram {
+            diagram,
+            config,
+            validation_status,
+            warnings,
+        } => {
             let escaped_diagram = escape_html(diagram);
-            format!("<div class=\"mermaid\">{}</div>", escaped_diagram)
+
+            // Build data attributes for configuration
+            let mut data_attrs = String::new();
+            if let Some(cfg) = config {
+                // Serialize config to JSON for data attribute
+                if let Ok(config_json) = serde_json::to_string(cfg) {
+                    data_attrs.push_str(&format!(
+                        " data-mermaid-config=\"{}\"",
+                        escape_html(&config_json)
+                    ));
+                }
+
+                // Also add individual attributes for easier access
+                if let Some(ref theme) = cfg.theme {
+                    data_attrs.push_str(&format!(" data-mermaid-theme=\"{}\"", escape_html(theme)));
+                }
+                if let Some(ref font_size) = cfg.font_size {
+                    data_attrs.push_str(&format!(
+                        " data-mermaid-font-size=\"{}\"",
+                        escape_html(font_size)
+                    ));
+                }
+                if let Some(ref font_family) = cfg.font_family {
+                    data_attrs.push_str(&format!(
+                        " data-mermaid-font-family=\"{}\"",
+                        escape_html(font_family)
+                    ));
+                }
+            }
+
+            // Add validation status as data attribute
+            let validation_attr = match validation_status {
+                ValidationStatus::Valid => " data-mermaid-valid=\"true\"",
+                ValidationStatus::Invalid { .. } => " data-mermaid-valid=\"false\"",
+                ValidationStatus::NotValidated => "",
+            };
+
+            // Build HTML with validation warnings as comments
+            let mut html = String::new();
+
+            // Add validation warning comments if present
+            if let ValidationStatus::Invalid { ref errors } = validation_status {
+                html.push_str("<!-- Mermaid validation errors:\n");
+                for error in errors {
+                    html.push_str(&format!("  - {}\n", escape_html(error)));
+                }
+                html.push_str("-->\n");
+            }
+
+            if !warnings.is_empty() {
+                html.push_str("<!-- Mermaid validation warnings:\n");
+                for warning in warnings {
+                    html.push_str(&format!("  - {}\n", escape_html(warning)));
+                }
+                html.push_str("-->\n");
+            }
+
+            html.push_str(&format!(
+                "<div class=\"mermaid\"{}{}>{}</div>",
+                data_attrs, validation_attr, escaped_diagram
+            ));
+
+            html
         }
         Node::Table {
             headers,
@@ -146,7 +221,10 @@ fn render_node(node: &Node) -> String {
 /// # Errors
 ///
 /// Returns an error if template files cannot be read
-pub(crate) fn render_to_html(ast: &[Node], config: &RendererConfig) -> Result<String, Box<dyn Error>> {
+pub(crate) fn render_to_html(
+    ast: &[Node],
+    config: &RendererConfig,
+) -> Result<String, Box<dyn Error>> {
     // Try to load from configured paths, fallback to include_str! if files don't exist
     let html_header = if std::path::Path::new(&config.html_header_path).exists() {
         std::fs::read_to_string(&config.html_header_path)?

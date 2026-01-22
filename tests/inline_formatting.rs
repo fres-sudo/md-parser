@@ -178,3 +178,150 @@ fn test_mixed_inline_elements() {
         _ => panic!("Expected Paragraph"),
     }
 }
+
+#[test]
+fn test_image() {
+    let input = "Here's an image ![alt text](https://example.com/image.png).".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 3);
+            assert_eq!(
+                inlines[0],
+                Inline::Text {
+                    content: "Here's an image ".to_string()
+                }
+            );
+            match &inlines[1] {
+                Inline::Image { alt, url } => {
+                    assert_eq!(alt, "alt text");
+                    assert_eq!(url, "https://example.com/image.png");
+                }
+                _ => panic!("Expected Image"),
+            }
+            assert_eq!(
+                inlines[2],
+                Inline::Text {
+                    content: ".".to_string()
+                }
+            );
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_image_empty_alt() {
+    let input = "![ ](https://example.com/image.png)".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Image { alt, url } => {
+                    assert_eq!(alt, " ");
+                    assert_eq!(url, "https://example.com/image.png");
+                }
+                _ => panic!("Expected Image"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_image_vs_link() {
+    let input = "![image](url.png) and [link](url.html)".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 3);
+            // First should be image
+            match &inlines[0] {
+                Inline::Image { alt, url } => {
+                    assert_eq!(alt, "image");
+                    assert_eq!(url, "url.png");
+                }
+                _ => panic!("Expected Image"),
+            }
+            // Second should be text " and "
+            assert_eq!(
+                inlines[1],
+                Inline::Text {
+                    content: " and ".to_string()
+                }
+            );
+            // Third should be link
+            match &inlines[2] {
+                Inline::Link { text, url } => {
+                    assert_eq!(text.len(), 1);
+                    assert_eq!(
+                        text[0],
+                        Inline::Text {
+                            content: "link".to_string()
+                        }
+                    );
+                    assert_eq!(url, "url.html");
+                }
+                _ => panic!("Expected Link"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_image_with_mixed_inline() {
+    let input = "See ![logo](logo.png) and visit [site](https://example.com) for **more** info."
+        .to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            // Should have image, link, and bold elements
+            let has_image = inlines
+                .iter()
+                .any(|inline| matches!(inline, Inline::Image { .. }));
+            let has_link = inlines
+                .iter()
+                .any(|inline| matches!(inline, Inline::Link { .. }));
+            let has_bold = inlines
+                .iter()
+                .any(|inline| matches!(inline, Inline::Bold { .. }));
+            assert!(has_image, "Expected Image element");
+            assert!(has_link, "Expected Link element");
+            assert!(has_bold, "Expected Bold element");
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_image_in_heading() {
+    let input = "# Header with ![icon](icon.png)".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Heading { level, content } => {
+            assert_eq!(*level, 1);
+            let has_image = content
+                .iter()
+                .any(|inline| matches!(inline, Inline::Image { .. }));
+            assert!(has_image, "Expected Image element in heading");
+        }
+        _ => panic!("Expected Heading"),
+    }
+}

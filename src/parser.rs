@@ -1,12 +1,16 @@
 //! Markdown parsing logic.
 
-use crate::ast::{Alignment, Inline, ListItem, Node, ParseError, Span};
+use crate::ast::{
+    Alignment, Inline, ListItem, MermaidConfig, Node, ParseError, Span, ValidationStatus,
+};
 use crate::config::ParserConfig;
 use regex::Regex;
+use std::collections::HashMap;
 
 /// Type of inline element match found during parsing
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InlineMatchType {
+    Image,
     Link,
     Bold,
     Italic,
@@ -14,6 +18,7 @@ enum InlineMatchType {
 
 /// Compiled regex patterns for inline element parsing
 struct RegexPatterns {
+    image: Regex,
     link: Regex,
     bold: Regex,
     italic: Regex,
@@ -23,6 +28,8 @@ impl RegexPatterns {
     /// Compile all regex patterns
     fn new() -> Result<Self, ParseError> {
         Ok(RegexPatterns {
+            image: Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)")
+                .map_err(|e| ParseError::RegexCompilationError(format!("Image regex: {}", e)))?,
             link: Regex::new(r"\[([^\]]+)\]\(([^)]+)\)")
                 .map_err(|e| ParseError::RegexCompilationError(format!("Link regex: {}", e)))?,
             bold: Regex::new(r"\*\*((?:[^*]|\*[^*\n])+?)\*\*")
@@ -30,6 +37,409 @@ impl RegexPatterns {
             italic: Regex::new(r"\*([^*\n]+?)\*")
                 .map_err(|e| ParseError::RegexCompilationError(format!("Italic regex: {}", e)))?,
         })
+    }
+}
+
+/// Mermaid diagram validator and configuration parser
+struct MermaidValidator;
+
+impl MermaidValidator {
+    /// Parse frontmatter configuration from Mermaid diagram
+    ///
+    /// Extracts inline configuration from Mermaid frontmatter syntax:
+    /// `%%{init: {'theme':'dark', 'themeVariables': {'fontSize':'18px'}}}%%`
+    ///
+    /// Returns (config, diagram_without_frontmatter)
+    fn parse_frontmatter(diagram: &str) -> (Option<MermaidConfig>, String) {
+        // Look for frontmatter pattern: %%{init: {...}}%%
+        // Frontmatter can be on first line or second line
+        let lines: Vec<&str> = diagram.lines().collect();
+        let mut frontmatter_line_idx = None;
+        let mut frontmatter_content = None;
+
+        // Check first two lines for frontmatter
+        for (idx, line) in lines.iter().take(2).enumerate() {
+            let trimmed_line = line.trim();
+            if trimmed_line.starts_with("%%{") {
+                if let Some(end_pos) = trimmed_line.find("}%%") {
+                    // end_pos is the start of "}%%", so we need +3 to include all 3 chars
+                    let frontmatter = &trimmed_line[..end_pos + 3];
+                    if let Some(config) = Self::parse_frontmatter_config(frontmatter) {
+                        frontmatter_line_idx = Some(idx);
+                        frontmatter_content = Some(config);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if let (Some(idx), Some(config)) = (frontmatter_line_idx, frontmatter_content) {
+            // Remove the frontmatter line from diagram
+            let mut diagram_lines = lines;
+            diagram_lines.remove(idx);
+            let diagram_content = diagram_lines.join("\n").trim().to_string();
+            (Some(config), diagram_content)
+        } else {
+            (None, diagram.to_string())
+        }
+    }
+
+    /// Parse frontmatter config from string like `%%{init: {'theme':'dark'}}%%`
+    fn parse_frontmatter_config(frontmatter: &str) -> Option<MermaidConfig> {
+        // Remove %%{ and }%%
+        let content = frontmatter.strip_prefix("%%{")?.strip_suffix("}%%")?;
+
+        // Look for init: {...}
+        if !content.trim_start().starts_with("init:") {
+            return None;
+        }
+
+        let init_content = content.trim_start().strip_prefix("init:")?.trim();
+
+        // Basic parsing of the config object
+        // This is a simplified parser - in production you might want a proper JSON parser
+        // For now, we'll extract common fields using string matching
+        let mut theme = None;
+        let mut font_size = None;
+        let mut font_family = None;
+        let mut theme_variables = None;
+
+        // Extract theme
+        if let Some(theme_match) = Self::extract_string_value(init_content, "theme") {
+            theme = Some(theme_match);
+        }
+
+        // Extract themeVariables
+        if let Some(tv_start) = init_content.find("themeVariables:") {
+            let tv_content = &init_content[tv_start + "themeVariables:".len()..].trim();
+            if let Some(tv_obj) = Self::extract_object(tv_content) {
+                let mut tv_map = HashMap::new();
+                
+                // Extract fontSize - try both with and without quotes in the extracted object
+                if let Some(fs) = Self::extract_string_value(&tv_obj, "fontSize") {
+                    font_size = Some(fs.clone());
+                    tv_map.insert("fontSize".to_string(), fs);
+                } else {
+                    // Try extracting directly from tv_obj if it's just the value
+                    // This handles cases where the object structure is different
+                    let fs_pattern = Regex::new(r"'fontSize'\s*:\s*'([^']+)'").ok();
+                    if let Some(re) = fs_pattern {
+                        if let Some(caps) = re.captures(&tv_obj) {
+                            if let Some(m) = caps.get(1) {
+                                let fs_val = m.as_str().to_string();
+                                font_size = Some(fs_val.clone());
+                                tv_map.insert("fontSize".to_string(), fs_val);
+                            }
+                        }
+                    }
+                }
+                
+                // Extract fontFamily
+                if let Some(ff) = Self::extract_string_value(&tv_obj, "fontFamily") {
+                    font_family = Some(ff.clone());
+                    tv_map.insert("fontFamily".to_string(), ff);
+                }
+                
+                if !tv_map.is_empty() {
+                    theme_variables = Some(tv_map);
+                }
+            }
+        }
+
+        // Only return config if we found something
+        if theme.is_some()
+            || font_size.is_some()
+            || font_family.is_some()
+            || theme_variables.is_some()
+        {
+            Some(MermaidConfig {
+                theme,
+                font_size,
+                font_family,
+                theme_variables,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Extract a string value from a config-like string
+    /// Looks for patterns like 'key':'value' or "key":"value"
+    fn extract_string_value(content: &str, key: &str) -> Option<String> {
+        // Try with single quotes first (more common in Mermaid config)
+        let pattern_single = format!(
+            "'{}'\\s*:\\s*'([^']+)'",
+            regex::escape(key)
+        );
+        if let Ok(re) = Regex::new(&pattern_single) {
+            if let Some(caps) = re.captures(content) {
+                if let Some(m) = caps.get(1) {
+                    return Some(m.as_str().to_string());
+                }
+            }
+        }
+        
+        // Fall back to double quotes
+        let pattern_double = format!(
+            "\"{}\"\\s*:\\s*\"([^\"]+)\"",
+            regex::escape(key)
+        );
+        if let Ok(re) = Regex::new(&pattern_double) {
+            if let Some(caps) = re.captures(content) {
+                if let Some(m) = caps.get(1) {
+                    return Some(m.as_str().to_string());
+                }
+            }
+        }
+        
+        // Try without quotes around key
+        let pattern_no_quote_key = format!(
+            "{}['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]",
+            regex::escape(key)
+        );
+        if let Ok(re) = Regex::new(&pattern_no_quote_key) {
+            if let Some(caps) = re.captures(content) {
+                if let Some(m) = caps.get(1) {
+                    return Some(m.as_str().to_string());
+                }
+            }
+        }
+        
+        None
+    }
+
+    /// Extract an object from a string (simplified - finds content between {})
+    fn extract_object(content: &str) -> Option<String> {
+        let trimmed = content.trim();
+        if !trimmed.starts_with('{') {
+            return None;
+        }
+
+        let mut depth = 0;
+        let mut start = 0;
+        for (i, ch) in trimmed.char_indices() {
+            if ch == '{' {
+                if depth == 0 {
+                    start = i + 1;
+                }
+                depth += 1;
+            } else if ch == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(trimmed[start..i].to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Merge global default config with inline config
+    fn merge_config(
+        default: &crate::config::MermaidParserConfig,
+        inline: Option<MermaidConfig>,
+    ) -> MermaidConfig {
+        if let Some(inline_config) = inline {
+            MermaidConfig {
+                theme: inline_config
+                    .theme
+                    .or_else(|| Some(default.default_theme.clone())),
+                font_size: inline_config
+                    .font_size
+                    .or_else(|| Some(default.default_font_size.clone())),
+                font_family: inline_config
+                    .font_family
+                    .or_else(|| Some(default.default_font_family.clone())),
+                theme_variables: inline_config.theme_variables,
+            }
+        } else {
+            MermaidConfig {
+                theme: Some(default.default_theme.clone()),
+                font_size: Some(default.default_font_size.clone()),
+                font_family: Some(default.default_font_family.clone()),
+                theme_variables: None,
+            }
+        }
+    }
+
+    /// Validate Mermaid diagram syntax
+    ///
+    /// Returns validation status and warnings
+    fn validate_syntax(diagram: &str, use_cli: bool) -> (ValidationStatus, Vec<String>) {
+        let mut warnings = Vec::new();
+        let mut errors = Vec::new();
+
+        let trimmed = diagram.trim();
+        if trimmed.is_empty() {
+            errors.push("Mermaid diagram is empty".to_string());
+            return (ValidationStatus::Invalid { errors }, warnings);
+        }
+
+        // Check for valid diagram type keywords
+        let valid_types = [
+            "graph",
+            "flowchart",
+            "sequenceDiagram",
+            "classDiagram",
+            "stateDiagram",
+            "stateDiagram-v2",
+            "erDiagram",
+            "journey",
+            "gantt",
+            "pie",
+            "requirementDiagram",
+            "gitgraph",
+            "mindmap",
+            "timeline",
+            "C4Context",
+            "C4Container",
+            "C4Component",
+        ];
+
+        let first_line = trimmed.lines().next().unwrap_or("").trim();
+        let mut found_type = false;
+        for diagram_type in &valid_types {
+            if first_line.starts_with(diagram_type) {
+                found_type = true;
+                break;
+            }
+        }
+
+        if !found_type {
+            errors.push(format!(
+                "Invalid or missing diagram type. Expected one of: {}",
+                valid_types.join(", ")
+            ));
+        }
+
+        // Check bracket/parenthesis balance
+        let mut paren_count = 0;
+        let mut bracket_count = 0;
+        let mut brace_count = 0;
+
+        for ch in trimmed.chars() {
+            match ch {
+                '(' => paren_count += 1,
+                ')' => {
+                    paren_count -= 1;
+                    if paren_count < 0 {
+                        errors.push("Unmatched closing parenthesis".to_string());
+                        break;
+                    }
+                }
+                '[' => bracket_count += 1,
+                ']' => {
+                    bracket_count -= 1;
+                    if bracket_count < 0 {
+                        errors.push("Unmatched closing bracket".to_string());
+                        break;
+                    }
+                }
+                '{' => brace_count += 1,
+                '}' => {
+                    brace_count -= 1;
+                    if brace_count < 0 {
+                        errors.push("Unmatched closing brace".to_string());
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if paren_count > 0 {
+            errors.push(format!("{} unmatched opening parenthesis(es)", paren_count));
+        }
+        if bracket_count > 0 {
+            errors.push(format!("{} unmatched opening bracket(s)", bracket_count));
+        }
+        if brace_count > 0 {
+            errors.push(format!("{} unmatched opening brace(s)", brace_count));
+        }
+
+        // Check for common arrow syntax issues
+        if trimmed.contains("-->") || trimmed.contains("---") || trimmed.contains("==>") {
+            // Basic check - arrows should have nodes on both sides
+            let arrow_pattern = Regex::new(r"(-->|==>|---)").ok();
+            if let Some(re) = arrow_pattern {
+                for mat in re.find_iter(trimmed) {
+                    let before = &trimmed[..mat.start()].trim();
+                    let after = &trimmed[mat.end()..].trim();
+
+                    if before.is_empty() || after.is_empty() {
+                        warnings.push("Arrow may be missing node on one side".to_string());
+                    }
+                }
+            }
+        }
+
+        // Optional CLI validation
+        if use_cli {
+            if let Some(cli_errors) = Self::validate_with_cli(trimmed) {
+                errors.extend(cli_errors);
+            } else {
+                warnings.push("Mermaid CLI not available, using basic validation only".to_string());
+            }
+        }
+
+        if errors.is_empty() {
+            (ValidationStatus::Valid, warnings)
+        } else {
+            (ValidationStatus::Invalid { errors }, warnings)
+        }
+    }
+
+    /// Attempt to validate using Mermaid CLI (if available)
+    fn validate_with_cli(diagram: &str) -> Option<Vec<String>> {
+        use std::fs;
+        use std::process::Command;
+
+        // Check if mmdc is available
+        if Command::new("mmdc").arg("--version").output().is_err() {
+            return None;
+        }
+
+        // Create a temporary file
+        let temp_dir = std::env::temp_dir();
+        let input_file = temp_dir.join(format!(
+            "mermaid_validate_{}.mmd",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+        ));
+        let output_file = temp_dir.join(format!(
+            "mermaid_validate_{}.svg",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+        ));
+
+        // Write diagram to temp file
+        if fs::write(&input_file, diagram).is_err() {
+            return None;
+        }
+
+        // Try to render with mmdc
+        let output = Command::new("mmdc")
+            .arg("-i")
+            .arg(&input_file)
+            .arg("-o")
+            .arg(&output_file)
+            .output();
+
+        // Clean up temp files
+        let _ = fs::remove_file(&input_file);
+        let _ = fs::remove_file(&output_file);
+
+        if let Ok(result) = output {
+            if !result.status.success() {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                return Some(vec![format!("Mermaid CLI validation failed: {}", stderr)]);
+            }
+        }
+
+        None
     }
 }
 
@@ -72,6 +482,15 @@ impl Parser {
         let mut match_type = None;
         let mut match_range = (0, 0);
 
+        // Check for images (must check before links since images start with !)
+        if let Some(m) = self.regex_patterns.image.find(text) {
+            if m.start() < earliest_pos {
+                earliest_pos = m.start();
+                match_type = Some(InlineMatchType::Image);
+                match_range = (m.start(), m.end());
+            }
+        }
+
         // Check for links
         if let Some(m) = self.regex_patterns.link.find(text) {
             if m.start() < earliest_pos {
@@ -105,6 +524,53 @@ impl Parser {
         }
 
         match_type.map(|mt| (match_range.0, match_range.1, mt))
+    }
+
+    /// Process an image match and add it to inlines
+    fn process_image_match<'a>(
+        &self,
+        remaining: &'a str,
+        match_range: (usize, usize),
+        inlines: &mut Vec<Inline>,
+    ) -> Result<&'a str, ParseError> {
+        // Add text before the image
+        if match_range.0 > 0 {
+            let text_before = &remaining[..match_range.0];
+            if !text_before.is_empty() {
+                inlines.push(Inline::Text {
+                    content: text_before.to_string(),
+                });
+            }
+        }
+
+        let match_text = &remaining[match_range.0..match_range.1];
+        let caps = self
+            .regex_patterns
+            .image
+            .captures(match_text)
+            .ok_or_else(|| {
+                ParseError::InvalidCaptureError("Failed to capture image groups".to_string())
+            })?;
+
+        let alt_text = caps
+            .get(1)
+            .ok_or_else(|| {
+                ParseError::InvalidCaptureError("Failed to capture image alt text".to_string())
+            })?
+            .as_str();
+        let image_url = caps
+            .get(2)
+            .ok_or_else(|| {
+                ParseError::InvalidCaptureError("Failed to capture image URL".to_string())
+            })?
+            .as_str();
+
+        inlines.push(Inline::Image {
+            alt: alt_text.to_string(),
+            url: image_url.to_string(),
+        });
+
+        Ok(&remaining[match_range.1..])
     }
 
     /// Process a link match and add it to inlines
@@ -250,6 +716,9 @@ impl Parser {
             if let Some((start, end, match_type)) = self.find_earliest_match(remaining) {
                 let match_range = (start, end);
                 remaining = match match_type {
+                    InlineMatchType::Image => {
+                        self.process_image_match(remaining, match_range, &mut inlines)?
+                    }
                     InlineMatchType::Link => {
                         self.process_link_match(remaining, match_range, &mut inlines)?
                     }
@@ -283,13 +752,13 @@ impl Parser {
 
     /// Parse a fenced code block starting at the given line index
     ///
-    /// Returns the node and the new line index after the code block.
+    /// Returns the node, the new line index after the code block, and any warnings.
     /// Errors with `UnclosedCodeBlock` if no closing fence is found before EOF.
     fn parse_code_block(
         &self,
         lines: &[&str],
         start_idx: usize,
-    ) -> Result<(Node, usize), ParseError> {
+    ) -> Result<(Node, usize, Vec<String>), ParseError> {
         let line = lines[start_idx].trim();
         let lang_tag = line[self.config.code_fence_length..].trim();
         let lang = if lang_tag.is_empty() {
@@ -322,15 +791,49 @@ impl Parser {
         let code = code_lines.join("\n");
 
         // Special handling for Mermaid diagrams
-        let node = if lang.as_ref().map(|s| s.to_lowercase())
+        if lang.as_ref().map(|s| s.to_lowercase())
             == Some(self.config.mermaid_language.to_lowercase())
         {
-            Node::MermaidDiagram { diagram: code }
-        } else {
-            Node::CodeBlock { lang, code }
-        };
+            // Parse frontmatter and extract configuration
+            let (inline_config, diagram_content) = MermaidValidator::parse_frontmatter(&code);
 
-        Ok((node, i + 1))
+            // Merge global and inline configuration
+            let merged_config = MermaidValidator::merge_config(&self.config.mermaid, inline_config);
+
+            // Validate syntax if enabled
+            let (validation_status, validation_warnings) = if self.config.mermaid.validate_syntax {
+                MermaidValidator::validate_syntax(
+                    &diagram_content,
+                    self.config.mermaid.use_cli_validation,
+                )
+            } else {
+                (ValidationStatus::NotValidated, Vec::new())
+            };
+
+            // Collect warnings to return
+            let mut warnings = Vec::new();
+            for warning in &validation_warnings {
+                warnings.push(format!("Mermaid diagram validation warning: {}", warning));
+            }
+
+            // Add validation errors to warnings (but keep as MermaidDiagram as requested)
+            if let ValidationStatus::Invalid { ref errors } = validation_status {
+                for error in errors {
+                    warnings.push(format!("Mermaid diagram validation error: {}", error));
+                }
+            }
+
+            let node = Node::MermaidDiagram {
+                diagram: diagram_content,
+                config: Some(merged_config),
+                validation_status,
+                warnings: validation_warnings,
+            };
+
+            Ok((node, i + 1, warnings))
+        } else {
+            Ok((Node::CodeBlock { lang, code }, i + 1, Vec::new()))
+        }
     }
 
     /// Parse a heading from a line
@@ -743,11 +1246,7 @@ impl Parser {
     /// # Errors
     ///
     /// Returns `ParseError` if parsing fails
-    fn parse_table(
-        &self,
-        lines: &[&str],
-        start_idx: usize,
-    ) -> Result<(Node, usize), ParseError> {
+    fn parse_table(&self, lines: &[&str], start_idx: usize) -> Result<(Node, usize), ParseError> {
         let mut i = start_idx;
 
         // Parse header row
@@ -832,7 +1331,9 @@ impl Parser {
             if current_line.is_empty() {
                 break;
             }
-            if current_line.starts_with('#') || current_line.starts_with(&self.config.code_fence_pattern) {
+            if current_line.starts_with('#')
+                || current_line.starts_with(&self.config.code_fence_pattern)
+            {
                 break;
             }
 
@@ -878,7 +1379,8 @@ impl Parser {
 
             // Check for fenced code blocks
             if line.starts_with(&self.config.code_fence_pattern) {
-                let (node, new_idx) = self.parse_code_block(&lines, i)?;
+                let (node, new_idx, warnings) = self.parse_code_block(&lines, i)?;
+                self.warnings.extend(warnings);
                 nodes.push(node);
                 i = new_idx;
                 continue;

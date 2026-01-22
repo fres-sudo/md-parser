@@ -1,6 +1,7 @@
 //! Shared AST types for the Markdown parser.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
@@ -94,6 +95,9 @@ pub enum Inline {
     /// Link [text](url)
     #[serde(rename = "link")]
     Link { text: Vec<Inline>, url: String },
+    /// Image ![alt](url)
+    #[serde(rename = "image")]
+    Image { alt: String, url: String },
 }
 
 /// A single item in an unordered list; may contain nested sub-lists.
@@ -106,6 +110,35 @@ pub struct ListItem {
     /// Task list checkbox state: None for regular items, Some(false) for unchecked, Some(true) for checked
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checked: Option<bool>,
+}
+
+/// Validation status for Mermaid diagrams
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum ValidationStatus {
+    /// Diagram syntax is valid
+    Valid,
+    /// Diagram syntax is invalid with error messages
+    Invalid { errors: Vec<String> },
+    /// Diagram has not been validated
+    NotValidated,
+}
+
+/// Configuration for Mermaid diagram rendering
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MermaidConfig {
+    /// Theme name (default, neutral, dark, forest, base)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    /// Font size (e.g., "16px")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_size: Option<String>,
+    /// Font family (e.g., "trebuchet ms, verdana, arial")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_family: Option<String>,
+    /// Additional theme variables as a JSON-like map
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme_variables: Option<HashMap<String, String>>,
 }
 
 /// Represents a node in the Markdown Abstract Syntax Tree
@@ -126,7 +159,18 @@ pub enum Node {
     CodeBlock { lang: Option<String>, code: String },
     /// A Mermaid diagram (distinct from CodeBlock)
     #[serde(rename = "mermaid_diagram")]
-    MermaidDiagram { diagram: String },
+    MermaidDiagram {
+        /// The diagram content
+        diagram: String,
+        /// Diagram-specific configuration (merged from global and inline)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        config: Option<MermaidConfig>,
+        /// Validation status of the diagram
+        validation_status: ValidationStatus,
+        /// Validation warnings (non-fatal issues)
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
+    },
     /// A markdown table
     #[serde(rename = "table")]
     Table {

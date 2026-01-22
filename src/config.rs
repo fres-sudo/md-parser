@@ -4,6 +4,58 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+/// Configuration for Mermaid diagram parser settings
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MermaidParserConfig {
+    /// Default theme (default, neutral, dark, forest, base)
+    #[serde(default = "default_mermaid_theme")]
+    pub default_theme: String,
+    /// Default font size (e.g., "16px")
+    #[serde(default = "default_mermaid_font_size")]
+    pub default_font_size: String,
+    /// Default font family
+    #[serde(default = "default_mermaid_font_family")]
+    pub default_font_family: String,
+    /// Enable syntax validation
+    #[serde(default = "default_true")]
+    pub validate_syntax: bool,
+    /// Use Mermaid CLI for validation if available (optional)
+    #[serde(default = "default_false")]
+    pub use_cli_validation: bool,
+}
+
+fn default_mermaid_theme() -> String {
+    "default".to_string()
+}
+
+fn default_mermaid_font_size() -> String {
+    "16px".to_string()
+}
+
+fn default_mermaid_font_family() -> String {
+    "trebuchet ms, verdana, arial".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_false() -> bool {
+    false
+}
+
+impl Default for MermaidParserConfig {
+    fn default() -> Self {
+        Self {
+            default_theme: default_mermaid_theme(),
+            default_font_size: default_mermaid_font_size(),
+            default_font_family: default_mermaid_font_family(),
+            validate_syntax: true,
+            use_cli_validation: false,
+        }
+    }
+}
+
 /// Configuration for the parser settings
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ParserConfig {
@@ -15,6 +67,9 @@ pub struct ParserConfig {
     pub code_fence_pattern: String,
     /// Language identifier for Mermaid diagrams
     pub mermaid_language: String,
+    /// Mermaid diagram configuration
+    #[serde(default)]
+    pub mermaid: MermaidParserConfig,
 }
 
 impl Default for ParserConfig {
@@ -24,6 +79,7 @@ impl Default for ParserConfig {
             code_fence_length: 3,
             code_fence_pattern: "```".to_string(),
             mermaid_language: "mermaid".to_string(),
+            mermaid: MermaidParserConfig::default(),
         }
     }
 }

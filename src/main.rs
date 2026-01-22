@@ -88,8 +88,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let markdown = read_input_file(file_path)?;
 
     // Load configuration
-    let config = Config::load_config()
-        .map_err(|e| format!("Failed to load configuration: {}", e))?;
+    let config =
+        Config::load_config().map_err(|e| format!("Failed to load configuration: {}", e))?;
 
     // Create parser with config
     let mut parser = Parser::with_config(markdown, config.parser.clone())?;
@@ -110,7 +110,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut outputs = Vec::new();
 
     if config.output.enable_ast_debug {
-        write_ast_debug(&ast, &config.output.directory, &config.output.ast_debug_filename)?;
+        write_ast_debug(
+            &ast,
+            &config.output.directory,
+            &config.output.ast_debug_filename,
+        )?;
         outputs.push(format!(
             "{}/{}",
             config.output.directory, config.output.ast_debug_filename

@@ -40,8 +40,23 @@ fn test_mermaid_diagram() {
 
     assert_eq!(result.len(), 1);
     match &result[0] {
-        Node::MermaidDiagram { diagram } => {
+        Node::MermaidDiagram {
+            diagram,
+            config,
+            validation_status,
+            warnings,
+        } => {
             assert_eq!(diagram, "graph TD\n    A-->B");
+            assert!(config.is_some(), "Config should be present");
+            // Validation should be Valid or NotValidated depending on config
+            match validation_status {
+                md_parser::ValidationStatus::Valid | md_parser::ValidationStatus::NotValidated => {}
+                _ => panic!("Expected Valid or NotValidated status"),
+            }
+            assert!(
+                warnings.is_empty(),
+                "No warnings expected for valid diagram"
+            );
         }
         _ => panic!("Expected MermaidDiagram, got {:?}", result[0]),
     }

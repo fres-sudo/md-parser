@@ -9,8 +9,8 @@ mod config;
 mod parser;
 mod renderer;
 
-pub use ast::{Alignment, Inline, Node, ParseError, Span};
-pub use config::{Config, OutputConfig, ParserConfig, RendererConfig};
+pub use ast::{Alignment, Inline, MermaidConfig, Node, ParseError, Span, ValidationStatus};
+pub use config::{Config, MermaidParserConfig, OutputConfig, ParserConfig, RendererConfig};
 pub use parser::Parser;
 
 use std::error::Error;

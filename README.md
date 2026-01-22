@@ -256,3 +256,7 @@ Can u improve the current mermaid implementation by adding:
 - Ensuring all the tests passes.
 - Ensuring the output/ folder contains the files.
 - Ensuring new tests passes.
+
+### Prompt 24 - Cursor (auto mode)
+
+Can you plan and build the possibility to parse and render images? (\!\[alt\]\(url\))

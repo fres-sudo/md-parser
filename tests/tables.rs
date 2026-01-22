@@ -2,13 +2,18 @@ use md_parser::{Alignment, Inline, Node, Parser};
 
 #[test]
 fn test_simple_table() {
-    let input = "| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |".to_string();
+    let input =
+        "| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |".to_string();
     let mut parser = Parser::new(input).unwrap();
     let result = parser.parse().unwrap();
 
     assert_eq!(result.len(), 1);
     match &result[0] {
-        Node::Table { headers, rows, alignments } => {
+        Node::Table {
+            headers,
+            rows,
+            alignments,
+        } => {
             assert_eq!(headers.len(), 2);
             assert_eq!(rows.len(), 1);
             assert_eq!(alignments.len(), 2);
@@ -48,13 +53,18 @@ fn test_simple_table() {
 
 #[test]
 fn test_table_with_alignment() {
-    let input = "| Left | Center | Right |\n|:-----|:------:|------:|\n| L    | C      | R     |".to_string();
+    let input = "| Left | Center | Right |\n|:-----|:------:|------:|\n| L    | C      | R     |"
+        .to_string();
     let mut parser = Parser::new(input).unwrap();
     let result = parser.parse().unwrap();
 
     assert_eq!(result.len(), 1);
     match &result[0] {
-        Node::Table { headers, rows, alignments } => {
+        Node::Table {
+            headers,
+            rows,
+            alignments,
+        } => {
             assert_eq!(headers.len(), 3);
             assert_eq!(rows.len(), 1);
             assert_eq!(alignments.len(), 3);
@@ -75,7 +85,11 @@ fn test_table_with_inline_formatting() {
 
     assert_eq!(result.len(), 1);
     match &result[0] {
-        Node::Table { headers, rows: _, alignments: _ } => {
+        Node::Table {
+            headers,
+            rows: _,
+            alignments: _,
+        } => {
             assert_eq!(headers.len(), 3);
             // First header should have bold
             match &headers[0][0] {
@@ -105,7 +119,11 @@ fn test_table_with_empty_cells() {
 
     assert_eq!(result.len(), 1);
     match &result[0] {
-        Node::Table { headers, rows, alignments: _ } => {
+        Node::Table {
+            headers,
+            rows,
+            alignments: _,
+        } => {
             assert_eq!(headers.len(), 3);
             assert_eq!(rows.len(), 2);
             // First row: A, empty, C
@@ -169,13 +187,18 @@ fn test_table_preceded_by_heading() {
 
 #[test]
 fn test_table_multiple_rows() {
-    let input = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob   | 25 |\n| Carol | 35 |".to_string();
+    let input = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob   | 25 |\n| Carol | 35 |"
+        .to_string();
     let mut parser = Parser::new(input).unwrap();
     let result = parser.parse().unwrap();
 
     assert_eq!(result.len(), 1);
     match &result[0] {
-        Node::Table { headers, rows, alignments: _ } => {
+        Node::Table {
+            headers,
+            rows,
+            alignments: _,
+        } => {
             assert_eq!(headers.len(), 2);
             assert_eq!(rows.len(), 3);
             // Check first data row
@@ -216,7 +239,8 @@ fn test_table_default_alignment() {
 
 #[test]
 fn test_table_with_trailing_pipe() {
-    let input = "| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |".to_string();
+    let input =
+        "| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |".to_string();
     let mut parser = Parser::new(input).unwrap();
     let result = parser.parse().unwrap();
 

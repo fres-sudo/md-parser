@@ -19,6 +19,23 @@ code_fence_pattern = "```"
 # Code blocks with this language tag will be parsed as MermaidDiagram nodes
 mermaid_language = "mermaid"
 
+# Mermaid Configuration
+[parser.mermaid]
+# Default theme (default, neutral, dark, forest, base)
+default_theme = "default"
+
+# Default font size (e.g., "16px")
+default_font_size = "16px"
+
+# Default font family
+default_font_family = "trebuchet ms, verdana, arial"
+
+# Enable syntax validation
+validate_syntax = true
+
+# Use Mermaid CLI for validation if available (optional)
+use_cli_validation = false
+
 # Renderer Configuration
 [renderer]
 # Output directory for rendered HTML files
