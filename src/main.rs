@@ -1,6 +1,8 @@
 use md_parser::Parser;
 use std::env;
 use std::fs;
+use std::io::Write;
+use std::path::Path;
 
 const OUTPUT_DIR: &str = "output";
 
@@ -12,6 +14,33 @@ fn read_input_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>
 fn ensure_output_dir() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(OUTPUT_DIR)
         .map_err(|e| format!("Error creating output dir '{}': {}", OUTPUT_DIR, e).into())
+}
+
+fn write_ast_debug(ast: &[md_parser::Node]) -> Result<(), Box<dyn std::error::Error>> {
+    let path = Path::new(OUTPUT_DIR).join("ast.txt");
+    let mut f = fs::File::create(&path)
+        .map_err(|e| format!("Error creating '{}': {}", path.display(), e))?;
+    writeln!(f, "Parsed AST (Debug Format):")?;
+    writeln!(f, "==========================\n")?;
+    for (i, node) in ast.iter().enumerate() {
+        writeln!(f, "  {}: {:?}\n", i, node)?;
+    }
+    Ok(())
+}
+
+fn write_ast_json(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
+    let path = Path::new(OUTPUT_DIR).join("ast.json");
+    let json = parser.to_json()?;
+    fs::write(&path, json).map_err(|e| {
+        let msg = format!("Error writing '{}': {}", path.display(), e);
+        Box::<dyn std::error::Error>::from(msg)
+    })?;
+    Ok(())
+}
+
+fn write_html_output(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
+    parser.to_html_file("output.html")?;
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,21 +55,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parser = Parser::new(markdown)?;
     let ast = parser.parse()?;
 
-    println!("Parsed AST (Phase 3 - Debug Format):");
-    println!("====================================\n");
-    for (i, node) in ast.iter().enumerate() {
-        println!("  {}: {:?}\n", i, node);
-    }
-
-    println!("\n\nParsed AST (JSON Format):");
-    println!("==========================\n");
-    let json = parser.to_json()?;
-    println!("{}", json);
-
-    println!("\n\nGenerating HTML file...");
     ensure_output_dir()?;
-    parser.to_html_file("output.html")?;
-    println!("✓ HTML file generated successfully: {}/output.html", OUTPUT_DIR);
+    write_ast_debug(&ast)?;
+    write_ast_json(&parser)?;
+    write_html_output(&parser)?;
+
+    println!(
+        "Wrote {}/ast.txt, {}/ast.json, {}/output.html",
+        OUTPUT_DIR, OUTPUT_DIR, OUTPUT_DIR
+    );
 
     Ok(())
 }
