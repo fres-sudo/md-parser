@@ -6,16 +6,31 @@ use std::path::Path;
 
 const OUTPUT_DIR: &str = "output";
 
+/// Read the input markdown file
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read
 fn read_input_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {
     fs::read_to_string(file_path)
         .map_err(|e| format!("Error reading file '{}': {}", file_path, e).into())
 }
 
+/// Ensure the output directory exists
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be created
 fn ensure_output_dir() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(OUTPUT_DIR)
         .map_err(|e| format!("Error creating output dir '{}': {}", OUTPUT_DIR, e).into())
 }
 
+/// Write the AST in debug format to a file in `output/`
+///
+/// # Errors
+///
+/// Returns an error if file writing fails
 fn write_ast_debug(ast: &[md_parser::Node]) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(OUTPUT_DIR).join("ast.txt");
     let mut f = fs::File::create(&path)
@@ -28,6 +43,11 @@ fn write_ast_debug(ast: &[md_parser::Node]) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+/// Write the AST in JSON format to a file in `output/`
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization or file writing fails
 fn write_ast_json(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(OUTPUT_DIR).join("ast.json");
     let json = parser.to_json()?;
@@ -38,6 +58,11 @@ fn write_ast_json(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Generate HTML output file in `output/`
+///
+/// # Errors
+///
+/// Returns an error if HTML generation or file writing fails
 fn write_html_output(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
     parser.to_html_file("output.html")?;
     Ok(())

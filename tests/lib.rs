@@ -379,7 +379,7 @@ fn test_nested_bold_italic() {
     match &result[0] {
         Node::Paragraph { content: inlines } => {
             // Should have at least "This is " text and a Bold element
-            assert!(inlines.len() >= 1);
+            assert!(!inlines.is_empty());
             // Check that we have a Bold element somewhere
             let has_bold = inlines
                 .iter()
