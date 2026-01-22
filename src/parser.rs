@@ -6,6 +6,23 @@ use regex::Regex;
 /// Maximum heading level supported (1-6)
 const MAX_HEADING_LEVEL: u8 = 6;
 
+/// Length of code block fence (```)
+const CODE_FENCE_LENGTH: usize = 3;
+
+/// Pattern for code block fence
+const CODE_FENCE_PATTERN: &str = "```";
+
+/// Language identifier for Mermaid diagrams
+const MERMAID_LANGUAGE: &str = "mermaid";
+
+/// Type of inline element match found during parsing
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InlineMatchType {
+    Link,
+    Bold,
+    Italic,
+}
+
 /// Compiled regex patterns for inline element parsing
 struct RegexPatterns {
     link: Regex,
@@ -50,7 +67,7 @@ impl Parser {
     }
 
     /// Find the earliest match among all inline patterns
-    fn find_earliest_match(&self, text: &str) -> Option<(usize, usize, &'static str)> {
+    fn find_earliest_match(&self, text: &str) -> Option<(usize, usize, InlineMatchType)> {
         let mut earliest_pos = text.len();
         let mut match_type = None;
         let mut match_range = (0, 0);
@@ -59,7 +76,7 @@ impl Parser {
         if let Some(m) = self.regex_patterns.link.find(text) {
             if m.start() < earliest_pos {
                 earliest_pos = m.start();
-                match_type = Some("link");
+                match_type = Some(InlineMatchType::Link);
                 match_range = (m.start(), m.end());
             }
         }
@@ -68,7 +85,7 @@ impl Parser {
         if let Some(m) = self.regex_patterns.bold.find(text) {
             if m.start() < earliest_pos {
                 earliest_pos = m.start();
-                match_type = Some("bold");
+                match_type = Some(InlineMatchType::Bold);
                 match_range = (m.start(), m.end());
             }
         }
@@ -82,7 +99,7 @@ impl Parser {
                 || (end < text.len() && text.as_bytes()[end] == b'*');
 
             if !is_bold && start < earliest_pos {
-                match_type = Some("italic");
+                match_type = Some(InlineMatchType::Italic);
                 match_range = (start, end);
             }
         }
@@ -233,12 +250,14 @@ impl Parser {
             if let Some((start, end, match_type)) = self.find_earliest_match(remaining) {
                 let match_range = (start, end);
                 remaining = match match_type {
-                    "link" => self.process_link_match(remaining, match_range, &mut inlines)?,
-                    "bold" => self.process_bold_match(remaining, match_range, &mut inlines)?,
-                    "italic" => self.process_italic_match(remaining, match_range, &mut inlines)?,
-                    _ => {
-                        // Unexpected match type (should not happen)
-                        &remaining[end..]
+                    InlineMatchType::Link => {
+                        self.process_link_match(remaining, match_range, &mut inlines)?
+                    }
+                    InlineMatchType::Bold => {
+                        self.process_bold_match(remaining, match_range, &mut inlines)?
+                    }
+                    InlineMatchType::Italic => {
+                        self.process_italic_match(remaining, match_range, &mut inlines)?
                     }
                 };
             } else {
@@ -268,7 +287,7 @@ impl Parser {
     /// Errors with `UnclosedCodeBlock` if no closing ``` is found before EOF.
     fn parse_code_block(lines: &[&str], start_idx: usize) -> Result<(Node, usize), ParseError> {
         let line = lines[start_idx].trim();
-        let lang_tag = line[3..].trim();
+        let lang_tag = line[CODE_FENCE_LENGTH..].trim();
         let lang = if lang_tag.is_empty() {
             None
         } else {
@@ -280,7 +299,7 @@ impl Parser {
         let mut i = start_idx + 1;
         let mut is_closed = false;
         while i < lines.len() {
-            if lines[i].trim() == "```" {
+            if lines[i].trim() == CODE_FENCE_PATTERN {
                 is_closed = true;
                 break;
             }
@@ -299,7 +318,8 @@ impl Parser {
         let code = code_lines.join("\n");
 
         // Special handling for Mermaid diagrams
-        let node = if lang.as_ref().map(|s| s.to_lowercase()) == Some("mermaid".to_string()) {
+        let node = if lang.as_ref().map(|s| s.to_lowercase()) == Some(MERMAID_LANGUAGE.to_string())
+        {
             Node::MermaidDiagram { diagram: code }
         } else {
             Node::CodeBlock { lang, code }
@@ -393,7 +413,7 @@ impl Parser {
 
         // Must not be a block element
         let trimmed = line.trim();
-        if trimmed.starts_with('#') || trimmed.starts_with("```") {
+        if trimmed.starts_with('#') || trimmed.starts_with(CODE_FENCE_PATTERN) {
             return None;
         }
 
@@ -426,7 +446,7 @@ impl Parser {
 
             // Check for block elements - end of list
             let trimmed = line.trim();
-            if trimmed.starts_with('#') || trimmed.starts_with("```") {
+            if trimmed.starts_with('#') || trimmed.starts_with(CODE_FENCE_PATTERN) {
                 break;
             }
 
@@ -572,7 +592,7 @@ impl Parser {
             if current_line.is_empty() {
                 break;
             }
-            if current_line.starts_with('#') || current_line.starts_with("```") {
+            if current_line.starts_with('#') || current_line.starts_with(CODE_FENCE_PATTERN) {
                 break;
             }
 
@@ -612,7 +632,7 @@ impl Parser {
             }
 
             // Check for fenced code blocks (```)
-            if line.starts_with("```") {
+            if line.starts_with(CODE_FENCE_PATTERN) {
                 let (node, new_idx) = Self::parse_code_block(&lines, i)?;
                 nodes.push(node);
                 i = new_idx;
