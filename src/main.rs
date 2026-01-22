@@ -1,6 +1,6 @@
 use md_parser::Parser;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let markdown = r#"# Phase 3 Demo
 
 This is a paragraph with **bold text** and *italic text*.
@@ -26,8 +26,8 @@ graph TD
 
 Another paragraph with mixed formatting: **bold** and *italic* and a [link](https://example.com)."#;
 
-    let parser = Parser::new(markdown.to_string());
-    let ast = parser.parse();
+    let parser = Parser::new(markdown.to_string())?;
+    let ast = parser.parse()?;
 
     println!("Parsed AST (Phase 3 - Debug Format):");
     println!("====================================\n");
@@ -37,13 +37,12 @@ Another paragraph with mixed formatting: **bold** and *italic* and a [link](http
 
     println!("\n\nParsed AST (JSON Format):");
     println!("==========================\n");
-    let json = parser.to_json();
+    let json = parser.to_json()?;
     println!("{}", json);
 
-    // Generate HTML file
     println!("\n\nGenerating HTML file...");
-    match parser.to_html_file("output.html") {
-        Ok(_) => println!("✓ HTML file generated successfully: output/output.html"),
-        Err(e) => println!("✗ Error generating HTML file: {}", e),
-    }
+    parser.to_html_file("output.html")?;
+    println!("✓ HTML file generated successfully: output/output.html");
+
+    Ok(())
 }
