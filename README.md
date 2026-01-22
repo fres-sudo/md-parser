@@ -112,3 +112,12 @@ Can you create a function that takes the json formatted AST and output an html  
 ### Prompt 7 - Cursor (auto mode)
 
 Can you split tests in a separate folder to ensure good code structure?
+
+### Prompt 8 - Cursor (auto mode)
+
+Can you move all the static assets that are currently beign hardcoded into the rust files to a separate folder/file for better mantainability code structure?
+
+### Prompt 9 - Cursor (auto mode)
+
+Can you please ensure that the html output of the program is located in a specific output/ folder?
+
