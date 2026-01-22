@@ -51,6 +51,15 @@ pub enum Inline {
     Link { text: Vec<Inline>, url: String },
 }
 
+/// A single item in an unordered list; may contain nested sub-lists.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ListItem {
+    /// Inline content of the list item
+    pub content: Vec<Inline>,
+    /// Nested sub-lists (indentation-based)
+    pub children: Vec<ListItem>,
+}
+
 /// Represents a node in the Markdown Abstract Syntax Tree
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -61,9 +70,9 @@ pub enum Node {
     /// A paragraph of text
     #[serde(rename = "paragraph")]
     Paragraph { content: Vec<Inline> },
-    /// An unordered list item
-    #[serde(rename = "list_item")]
-    ListItem { content: Vec<Inline> },
+    /// An unordered list (markers `-`, `*`, `+`) with optional nesting
+    #[serde(rename = "unordered_list")]
+    UnorderedList { items: Vec<ListItem> },
     /// A fenced code block with optional language identifier
     #[serde(rename = "code_block")]
     CodeBlock { lang: Option<String>, code: String },

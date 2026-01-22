@@ -48,7 +48,7 @@ fn write_ast_debug(ast: &[md_parser::Node]) -> Result<(), Box<dyn std::error::Er
 /// # Errors
 ///
 /// Returns an error if JSON serialization or file writing fails
-fn write_ast_json(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
+fn write_ast_json(parser: &mut Parser) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(OUTPUT_DIR).join("ast.json");
     let json = parser.to_json()?;
     fs::write(&path, json).map_err(|e| {
@@ -63,7 +63,7 @@ fn write_ast_json(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
 /// # Errors
 ///
 /// Returns an error if HTML generation or file writing fails
-fn write_html_output(parser: &Parser) -> Result<(), Box<dyn std::error::Error>> {
+fn write_html_output(parser: &mut Parser) -> Result<(), Box<dyn std::error::Error>> {
     parser.to_html_file("output.html")?;
     Ok(())
 }
@@ -77,13 +77,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_path = &args[1];
     let markdown = read_input_file(file_path)?;
 
-    let parser = Parser::new(markdown)?;
+    let mut parser = Parser::new(markdown)?;
     let ast = parser.parse()?;
+
+    // Check for warnings and display them
+    let warnings = parser.warnings();
+    if !warnings.is_empty() {
+        for warning in warnings {
+            eprintln!("Warning: {}", warning);
+        }
+    }
 
     ensure_output_dir()?;
     write_ast_debug(&ast)?;
-    write_ast_json(&parser)?;
-    write_html_output(&parser)?;
+    write_ast_json(&mut parser)?;
+    write_html_output(&mut parser)?;
 
     println!(
         "Wrote {}/ast.txt, {}/ast.json, {}/output.html",

@@ -1,6 +1,6 @@
 //! HTML rendering logic.
 
-use crate::ast::{Inline, Node};
+use crate::ast::{Inline, ListItem, Node};
 use std::error::Error;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
@@ -34,6 +34,24 @@ fn render_inline(inline: &Inline) -> String {
     }
 }
 
+/// Render a list item and its nested children recursively
+fn render_list_item(item: &ListItem) -> String {
+    let content: String = item.content.iter().map(render_inline).collect();
+    let mut html = format!("<li>{}", content);
+
+    // Render nested children if any
+    if !item.children.is_empty() {
+        html.push_str("<ul>");
+        for child in &item.children {
+            html.push_str(&render_list_item(child));
+        }
+        html.push_str("</ul>");
+    }
+
+    html.push_str("</li>");
+    html
+}
+
 /// Render a single node to HTML
 fn render_node(node: &Node) -> String {
     match node {
@@ -45,9 +63,13 @@ fn render_node(node: &Node) -> String {
             let inner: String = content.iter().map(render_inline).collect();
             format!("<p>{}</p>", inner)
         }
-        Node::ListItem { content } => {
-            let inner: String = content.iter().map(render_inline).collect();
-            format!("<li>{}</li>", inner)
+        Node::UnorderedList { items } => {
+            let mut html = String::from("<ul>");
+            for item in items {
+                html.push_str(&render_list_item(item));
+            }
+            html.push_str("</ul>");
+            html
         }
         Node::CodeBlock { lang, code } => {
             let lang_class = lang

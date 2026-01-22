@@ -161,3 +161,20 @@ Can you split up the parsing logic from the rendering logic in @src/lib.rs file?
 - Ensuring all the tests passes.
 - Ensuring the output/ folder contains the files.
 - Ensuring new tests passes.
+
+### Prompt 15 - Cursor (auto mode)
+
+Can you edit the AST and add logic for lists? Currently there's no parsing logic for unordered lists or nested lists with indentation. Add tests for that.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+
+### Prompt 16 - Cursor (auto mode)
+
+Can you edit the parsing logic and handle also unclosed code blocks gracefully? Add warnings in the cli for unclosed code blocks and auto-close them at EOF.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+

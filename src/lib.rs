@@ -19,7 +19,7 @@ impl Parser {
     /// # Errors
     ///
     /// Returns `ParseError` if parsing fails
-    pub fn to_html(&self) -> Result<String, ParseError> {
+    pub fn to_html(&mut self) -> Result<String, ParseError> {
         let ast = self.parse()?;
         Ok(renderer::render_to_html(&ast))
     }
@@ -29,7 +29,7 @@ impl Parser {
     /// # Errors
     ///
     /// Returns `ParseError` if parsing fails, or `std::io::Error` if file operations fail
-    pub fn to_html_file(&self, filename: &str) -> Result<(), Box<dyn Error>> {
+    pub fn to_html_file(&mut self, filename: &str) -> Result<(), Box<dyn Error>> {
         let ast = self.parse()?;
         renderer::render_to_html_file(&ast, filename)
     }
