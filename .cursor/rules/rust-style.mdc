@@ -1,0 +1,164 @@
+---
+alwaysApply: true
+---
+
+# Rust Code Styling and Best Practices
+
+## General Principles
+- **Readability First:** Code should be clear and self-documenting.
+- **Safety:** Leverage Rust's type system and ownership model to prevent bugs.
+- **Performance:** Write idiomatic Rust; the compiler will optimize well.
+- **Consistency:** Follow established Rust conventions and community standards.
+
+## Code Formatting
+- **Always run `cargo fmt`** before committing code.
+- **Line length:** Default to 100 characters (rustfmt default), but prefer readability over strict limits.
+- **Indentation:** 4 spaces (rustfmt default).
+- **Trailing commas:** Use in multi-line structs, enums, and function arguments.
+- **Blank lines:** Use sparingly to separate logical sections.
+
+## Naming Conventions
+- **Types:** `PascalCase` (e.g., `MarkdownParser`, `AstNode`)
+- **Functions/Methods:** `snake_case` (e.g., `parse_markdown`, `build_ast`)
+- **Variables:** `snake_case` (e.g., `input_text`, `node_list`)
+- **Constants:** `SCREAMING_SNAKE_CASE` (e.g., `MAX_DEPTH`, `DEFAULT_CONFIG`)
+- **Lifetimes:** Short, lowercase, typically `'a`, `'b`, `'ctx`
+- **Module names:** `snake_case` (e.g., `markdown_parser`, `ast_builder`)
+
+## Error Handling
+- **Prefer `Result<T, E>` over panics** in library code.
+- **Use `?` operator** for error propagation when appropriate.
+- **Custom error types:** Implement `std::error::Error` trait for better error context.
+- **Avoid `unwrap()` and `expect()`** in production code; use proper error handling.
+- **`unwrap()` is acceptable** only in:
+  - Test code
+  - Prototypes/quick scripts
+  - Cases where invariants guarantee success (document why)
+- **Use `Option<T>`** for values that may or may not exist.
+- **Use `Result<T, E>`** for operations that can fail.
+
+## Type System Best Practices
+- **Prefer explicit types** when it improves clarity.
+- **Use type aliases** for complex types that appear frequently.
+- **Leverage `impl Trait`** for return types when appropriate.
+- **Use `dyn Trait`** only when necessary (trait objects have runtime cost).
+- **Prefer generics** over trait objects when possible.
+
+## Ownership and Borrowing
+- **Use references (`&T`)** when you don't need ownership.
+- **Use `&mut T`** only when mutation is required.
+- **Prefer borrowing over cloning** when possible.
+- **Use `clone()` explicitly** when ownership transfer is needed (makes cost visible).
+- **Consider `Cow<'a, T>`** for cases where you might need owned or borrowed data.
+
+## Pattern Matching
+- **Use `match`** for exhaustive pattern matching.
+- **Use `if let`** for single-case pattern matching.
+- **Use `while let`** for loop pattern matching.
+- **Prefer pattern matching** over `unwrap()` or manual checks.
+- **Use `_`** for unused bindings.
+- **Use `..`** to ignore remaining fields in structs.
+
+## Functions and Methods
+- **Keep functions small and focused** (single responsibility).
+- **Use descriptive names** that indicate what the function does.
+- **Prefer returning values** over mutating parameters when possible.
+- **Use `self`, `&self`, `&mut self`** appropriately:
+  - `self` - takes ownership
+  - `&self` - immutable borrow (most common)
+  - `&mut self` - mutable borrow
+- **Document public functions** with `///` doc comments.
+- **Use `#[must_use]`** for functions whose return values should not be ignored.
+
+## Structs and Enums
+- **Use structs** for grouping related data.
+- **Use enums** for representing variants of a type.
+- **Derive common traits:** `Debug`, `Clone`, `PartialEq`, `Eq` when appropriate.
+- **Use `#[derive(Debug)]`** for all public types (essential for debugging).
+- **Consider `Copy`** for small, simple types.
+- **Use `#[non_exhaustive]`** for enums that may grow in the future.
+
+## Modules and Organization
+- **One module per file** (or `mod.rs` for directory modules).
+- **Use `pub`** only for items that need to be public.
+- **Group related items** together.
+- **Use `use` statements** at the top of the file.
+- **Prefer absolute paths** in `use` statements for clarity.
+- **Re-export** commonly used items with `pub use`.
+
+## Documentation
+- **Document all public APIs** with `///` doc comments.
+- **Use `//!`** for module-level documentation.
+- **Include examples** in doc comments with `# Examples`.
+- **Document panics** with `# Panics` section.
+- **Document errors** with `# Errors` section.
+- **Use markdown** in doc comments for formatting.
+
+## Testing
+- **Write tests** in a `#[cfg(test)]` module or separate `tests/` directory.
+- **Use descriptive test names** that explain what is being tested.
+- **Follow TDD** when appropriate (write tests first).
+- **Test edge cases:** empty inputs, boundary values, error conditions.
+- **Use `#[test]`** for unit tests.
+- **Use `#[should_panic]`** sparingly; prefer `Result`-based error handling.
+- **Use `assert_eq!`** and `assert!` for assertions.
+- **Use `#[ignore]`** for slow or integration tests.
+
+## Performance Considerations
+- **Measure before optimizing** (use `cargo bench`).
+- **Prefer iterators** over manual loops (they're often optimized better).
+- **Use `Vec::with_capacity()`** when you know the size in advance.
+- **Consider `String::with_capacity()`** for string building.
+- **Use `&str`** over `String` when you don't need ownership.
+- **Avoid unnecessary allocations** in hot paths.
+
+## Clippy and Linting
+- **Run `cargo clippy`** regularly and address warnings.
+- **Use `#[allow(clippy::lint_name)]`** only when you have a good reason.
+- **Document why** you're ignoring a clippy warning.
+- **Enable clippy lints** in `Cargo.toml` for stricter checks:
+  ```toml
+  [lints.clippy]
+  warnings = "warn"
+  ```
+
+## Common Patterns
+- **Builder pattern** for complex struct initialization.
+- **Iterator adapters** (`map`, `filter`, `collect`, etc.) over manual loops.
+- **`Option::map`** and `Option::and_then`** for chaining operations.
+- **`Result::map`** and `Result::and_then`** for error handling chains.
+- **Early returns** to reduce nesting.
+- **Guard clauses** for validation.
+
+## Dependencies
+- **Minimize dependencies** - only add what you need.
+- **Prefer standard library** solutions when available.
+- **Use well-maintained crates** from crates.io.
+- **Pin versions** in `Cargo.toml` for reproducible builds.
+- **Review dependencies** regularly for security updates.
+
+## Unsafe Code
+- **Avoid `unsafe`** unless absolutely necessary.
+- **Document why `unsafe` is needed** and what invariants must be maintained.
+- **Keep `unsafe` blocks small** and well-tested.
+- **Use `unsafe` abstractions** to encapsulate unsafe code.
+
+## Comments
+- **Explain "why", not "what"** - code should be self-explanatory.
+- **Use `//`** for inline comments.
+- **Use `/* */`** for multi-line comments (rarely needed).
+- **Remove commented-out code** - use version control instead.
+- **Keep comments up-to-date** with code changes.
+
+## Constants and Configuration
+- **Use `const`** for compile-time constants.
+- **Use `static`** for global mutable state (rare, prefer other patterns).
+- **Use `lazy_static` or `once_cell`** for lazy initialization if needed.
+- **Group related constants** in modules or structs.
+
+## Memory and Resource Management
+- **Rely on RAII** (Resource Acquisition Is Initialization).
+- **Use `Drop` trait** for cleanup when needed.
+- **Prefer stack allocation** over heap when possible.
+- **Use `Box<T>`** for large types or recursive structures.
+- **Use `Rc<T>`** or `Arc<T>`** only when shared ownership is necessary.
