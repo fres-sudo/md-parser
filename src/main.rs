@@ -1,4 +1,12 @@
 use md_parser::Parser;
+use std::fs;
+
+const OUTPUT_DIR: &str = "output";
+
+fn ensure_output_dir() -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(OUTPUT_DIR)
+        .map_err(|e| format!("Error creating output dir '{}': {}", OUTPUT_DIR, e).into())
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let markdown = r#"# Phase 3 Demo
@@ -41,8 +49,9 @@ Another paragraph with mixed formatting: **bold** and *italic* and a [link](http
     println!("{}", json);
 
     println!("\n\nGenerating HTML file...");
+    ensure_output_dir()?;
     parser.to_html_file("output.html")?;
-    println!("✓ HTML file generated successfully: output/output.html");
+    println!("✓ HTML file generated successfully: {}/output.html", OUTPUT_DIR);
 
     Ok(())
 }
