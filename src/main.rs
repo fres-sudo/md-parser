@@ -1,7 +1,13 @@
 use md_parser::Parser;
+use std::env;
 use std::fs;
 
 const OUTPUT_DIR: &str = "output";
+
+fn read_input_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    fs::read_to_string(file_path)
+        .map_err(|e| format!("Error reading file '{}': {}", file_path, e).into())
+}
 
 fn ensure_output_dir() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(OUTPUT_DIR)
@@ -9,32 +15,15 @@ fn ensure_output_dir() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let markdown = r#"# Phase 3 Demo
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        eprintln!("Usage: {} <input.md>", args[0]);
+        std::process::exit(1);
+    }
+    let file_path = &args[1];
+    let markdown = read_input_file(file_path)?;
 
-This is a paragraph with **bold text** and *italic text*.
-
-Here's a [link to Rust](https://rust-lang.org) in the text.
-
-```rust
-fn main() {
-    println!("Hello, Rust!");
-}
-```
-
-Here's a Mermaid diagram:
-
-```mermaid
-graph TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[Action 1]
-    B -->|No| D[Action 2]
-```
-
-## Subheading with **Bold** and *Italic*
-
-Another paragraph with mixed formatting: **bold** and *italic* and a [link](https://example.com)."#;
-
-    let parser = Parser::new(markdown.to_string())?;
+    let parser = Parser::new(markdown)?;
     let ast = parser.parse()?;
 
     println!("Parsed AST (Phase 3 - Debug Format):");
