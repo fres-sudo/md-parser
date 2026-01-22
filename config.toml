@@ -1,0 +1,60 @@
+# Markdown Parser Configuration File
+#
+# This file configures the behavior of the Markdown parser, renderer, and output settings.
+# If this file is missing, default values will be used.
+
+# Parser Configuration
+[parser]
+# Maximum heading level supported (1-6)
+# Headings with more than this number of # characters will be rejected
+max_heading_level = 6
+
+# Length of code block fence (typically 3 for ```)
+code_fence_length = 3
+
+# Pattern for code block fence (typically "```")
+code_fence_pattern = "```"
+
+# Language identifier for Mermaid diagrams
+# Code blocks with this language tag will be parsed as MermaidDiagram nodes
+mermaid_language = "mermaid"
+
+# Renderer Configuration
+[renderer]
+# Output directory for rendered HTML files
+output_directory = "output"
+
+# Path to HTML header template file (relative to project root)
+html_header_path = "assets/html_header.html"
+
+# Path to HTML footer template file (relative to project root)
+html_footer_path = "assets/html_footer.html"
+
+# Path to HTML body start template file (relative to project root)
+html_body_start_path = "assets/html_body_start.html"
+
+# Path to CSS styles file (relative to project root)
+styles_css_path = "assets/styles.css"
+
+# Output Configuration
+[output]
+# Output directory for all generated files
+directory = "output"
+
+# Filename for AST debug output (plain text format)
+ast_debug_filename = "ast.txt"
+
+# Filename for AST JSON output
+ast_json_filename = "ast.json"
+
+# Filename for HTML output
+html_filename = "output.html"
+
+# Enable AST debug output (set to false to disable)
+enable_ast_debug = true
+
+# Enable AST JSON output (set to false to disable)
+enable_ast_json = true
+
+# Enable HTML output (set to false to disable)
+enable_html = true

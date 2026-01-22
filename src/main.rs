@@ -1,10 +1,8 @@
-use md_parser::Parser;
+use md_parser::{Config, Parser};
 use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-
-const OUTPUT_DIR: &str = "output";
 
 /// Read the input markdown file
 ///
@@ -21,18 +19,22 @@ fn read_input_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>
 /// # Errors
 ///
 /// Returns an error if the directory cannot be created
-fn ensure_output_dir() -> Result<(), Box<dyn std::error::Error>> {
-    fs::create_dir_all(OUTPUT_DIR)
-        .map_err(|e| format!("Error creating output dir '{}': {}", OUTPUT_DIR, e).into())
+fn ensure_output_dir(output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(output_dir)
+        .map_err(|e| format!("Error creating output dir '{}': {}", output_dir, e).into())
 }
 
-/// Write the AST in debug format to a file in `output/`
+/// Write the AST in debug format to a file
 ///
 /// # Errors
 ///
 /// Returns an error if file writing fails
-fn write_ast_debug(ast: &[md_parser::Node]) -> Result<(), Box<dyn std::error::Error>> {
-    let path = Path::new(OUTPUT_DIR).join("ast.txt");
+fn write_ast_debug(
+    ast: &[md_parser::Node],
+    output_dir: &str,
+    filename: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = Path::new(output_dir).join(filename);
     let mut f = fs::File::create(&path)
         .map_err(|e| format!("Error creating '{}': {}", path.display(), e))?;
     writeln!(f, "Parsed AST (Debug Format):")?;
@@ -43,13 +45,17 @@ fn write_ast_debug(ast: &[md_parser::Node]) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-/// Write the AST in JSON format to a file in `output/`
+/// Write the AST in JSON format to a file
 ///
 /// # Errors
 ///
 /// Returns an error if JSON serialization or file writing fails
-fn write_ast_json(parser: &mut Parser) -> Result<(), Box<dyn std::error::Error>> {
-    let path = Path::new(OUTPUT_DIR).join("ast.json");
+fn write_ast_json(
+    parser: &mut Parser,
+    output_dir: &str,
+    filename: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = Path::new(output_dir).join(filename);
     let json = parser.to_json()?;
     fs::write(&path, json).map_err(|e| {
         let msg = format!("Error writing '{}': {}", path.display(), e);
@@ -58,13 +64,17 @@ fn write_ast_json(parser: &mut Parser) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-/// Generate HTML output file in `output/`
+/// Generate HTML output file
 ///
 /// # Errors
 ///
 /// Returns an error if HTML generation or file writing fails
-fn write_html_output(parser: &mut Parser) -> Result<(), Box<dyn std::error::Error>> {
-    parser.to_html_file("output.html")?;
+fn write_html_output(
+    parser: &mut Parser,
+    filename: &str,
+    renderer_config: &md_parser::RendererConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    parser.to_html_file_with_config(filename, renderer_config)?;
     Ok(())
 }
 
@@ -77,7 +87,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_path = &args[1];
     let markdown = read_input_file(file_path)?;
 
-    let mut parser = Parser::new(markdown)?;
+    // Load configuration
+    let config = Config::load_config()
+        .map_err(|e| format!("Failed to load configuration: {}", e))?;
+
+    // Create parser with config
+    let mut parser = Parser::with_config(markdown, config.parser.clone())?;
     let ast = parser.parse()?;
 
     // Check for warnings and display them
@@ -88,15 +103,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    ensure_output_dir()?;
-    write_ast_debug(&ast)?;
-    write_ast_json(&mut parser)?;
-    write_html_output(&mut parser)?;
+    // Ensure output directory exists
+    ensure_output_dir(&config.output.directory)?;
 
-    println!(
-        "Wrote {}/ast.txt, {}/ast.json, {}/output.html",
-        OUTPUT_DIR, OUTPUT_DIR, OUTPUT_DIR
-    );
+    // Write outputs based on configuration
+    let mut outputs = Vec::new();
+
+    if config.output.enable_ast_debug {
+        write_ast_debug(&ast, &config.output.directory, &config.output.ast_debug_filename)?;
+        outputs.push(format!(
+            "{}/{}",
+            config.output.directory, config.output.ast_debug_filename
+        ));
+    }
+
+    if config.output.enable_ast_json {
+        write_ast_json(
+            &mut parser,
+            &config.output.directory,
+            &config.output.ast_json_filename,
+        )?;
+        outputs.push(format!(
+            "{}/{}",
+            config.output.directory, config.output.ast_json_filename
+        ));
+    }
+
+    if config.output.enable_html {
+        write_html_output(&mut parser, &config.output.html_filename, &config.renderer)?;
+        outputs.push(format!(
+            "{}/{}",
+            config.output.directory, config.output.html_filename
+        ));
+    }
+
+    if !outputs.is_empty() {
+        println!("Wrote: {}", outputs.join(", "));
+    } else {
+        println!("No outputs enabled in configuration");
+    }
 
     Ok(())
 }

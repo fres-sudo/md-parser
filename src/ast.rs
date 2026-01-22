@@ -66,6 +66,18 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {}
 
+/// Column alignment for tables
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Alignment {
+    /// Left alignment
+    Left,
+    /// Center alignment
+    Center,
+    /// Right alignment
+    Right,
+}
+
 /// Represents inline elements within text (bold, italic, links, plain text)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -91,6 +103,9 @@ pub struct ListItem {
     pub content: Vec<Inline>,
     /// Nested sub-lists (indentation-based)
     pub children: Vec<ListItem>,
+    /// Task list checkbox state: None for regular items, Some(false) for unchecked, Some(true) for checked
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checked: Option<bool>,
 }
 
 /// Represents a node in the Markdown Abstract Syntax Tree
@@ -112,4 +127,14 @@ pub enum Node {
     /// A Mermaid diagram (distinct from CodeBlock)
     #[serde(rename = "mermaid_diagram")]
     MermaidDiagram { diagram: String },
+    /// A markdown table
+    #[serde(rename = "table")]
+    Table {
+        /// Header row cells (each cell is a vector of inline elements)
+        headers: Vec<Vec<Inline>>,
+        /// Data rows (each row is a vector of cells, each cell is a vector of inline elements)
+        rows: Vec<Vec<Vec<Inline>>>,
+        /// Column alignments (None = default/left, Some(Alignment) for explicit alignment)
+        alignments: Vec<Option<Alignment>>,
+    },
 }

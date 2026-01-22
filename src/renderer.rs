@@ -1,6 +1,7 @@
 //! HTML rendering logic.
 
-use crate::ast::{Inline, ListItem, Node};
+use crate::ast::{Alignment, Inline, ListItem, Node};
+use crate::config::RendererConfig;
 use std::error::Error;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
@@ -37,7 +38,19 @@ fn render_inline(inline: &Inline) -> String {
 /// Render a list item and its nested children recursively
 fn render_list_item(item: &ListItem) -> String {
     let content: String = item.content.iter().map(render_inline).collect();
-    let mut html = format!("<li>{}", content);
+    
+    // Render checkbox for task list items
+    let checkbox = if let Some(checked) = item.checked {
+        if checked {
+            "<input type=\"checkbox\" disabled checked> "
+        } else {
+            "<input type=\"checkbox\" disabled> "
+        }
+    } else {
+        ""
+    };
+    
+    let mut html = format!("<li>{}{}", checkbox, content);
 
     // Render nested children if any
     if !item.children.is_empty() {
@@ -83,45 +96,113 @@ fn render_node(node: &Node) -> String {
             let escaped_diagram = escape_html(diagram);
             format!("<div class=\"mermaid\">{}</div>", escaped_diagram)
         }
+        Node::Table {
+            headers,
+            rows,
+            alignments,
+        } => {
+            let mut html = String::from("<table>\n<thead>\n<tr>");
+            for (i, header_cell) in headers.iter().enumerate() {
+                let alignment = alignments
+                    .get(i)
+                    .and_then(|a| a.as_ref())
+                    .map(|a| match a {
+                        Alignment::Left => " style=\"text-align: left;\"",
+                        Alignment::Center => " style=\"text-align: center;\"",
+                        Alignment::Right => " style=\"text-align: right;\"",
+                    })
+                    .unwrap_or_default();
+                let cell_content: String = header_cell.iter().map(render_inline).collect();
+                html.push_str(&format!("<th{}>{}</th>", alignment, cell_content));
+            }
+            html.push_str("</tr>\n</thead>\n<tbody>");
+            for row in rows {
+                html.push_str("<tr>");
+                for (i, cell) in row.iter().enumerate() {
+                    let alignment = alignments
+                        .get(i)
+                        .and_then(|a| a.as_ref())
+                        .map(|a| match a {
+                            Alignment::Left => " style=\"text-align: left;\"",
+                            Alignment::Center => " style=\"text-align: center;\"",
+                            Alignment::Right => " style=\"text-align: right;\"",
+                        })
+                        .unwrap_or_default();
+                    let cell_content: String = cell.iter().map(render_inline).collect();
+                    html.push_str(&format!("<td{}>{}</td>", alignment, cell_content));
+                }
+                html.push_str("</tr>");
+            }
+            html.push_str("</tbody>\n</table>");
+            html
+        }
     }
 }
 
 /// Generate a complete HTML document from the AST.
 ///
-/// Loads header, styles, body start, and footer from assets, then renders each node.
-pub(crate) fn render_to_html(ast: &[Node]) -> String {
-    const HTML_HEADER: &str = include_str!("../assets/html_header.html");
-    const STYLES_CSS: &str = include_str!("../assets/styles.css");
-    const HTML_BODY_START: &str = include_str!("../assets/html_body_start.html");
-    const HTML_FOOTER: &str = include_str!("../assets/html_footer.html");
+/// Loads header, styles, body start, and footer from configured paths, then renders each node.
+///
+/// # Errors
+///
+/// Returns an error if template files cannot be read
+pub(crate) fn render_to_html(ast: &[Node], config: &RendererConfig) -> Result<String, Box<dyn Error>> {
+    // Try to load from configured paths, fallback to include_str! if files don't exist
+    let html_header = if std::path::Path::new(&config.html_header_path).exists() {
+        std::fs::read_to_string(&config.html_header_path)?
+    } else {
+        include_str!("../assets/html_header.html").to_string()
+    };
+
+    let styles_css = if std::path::Path::new(&config.styles_css_path).exists() {
+        std::fs::read_to_string(&config.styles_css_path)?
+    } else {
+        include_str!("../assets/styles.css").to_string()
+    };
+
+    let html_body_start = if std::path::Path::new(&config.html_body_start_path).exists() {
+        std::fs::read_to_string(&config.html_body_start_path)?
+    } else {
+        include_str!("../assets/html_body_start.html").to_string()
+    };
+
+    let html_footer = if std::path::Path::new(&config.html_footer_path).exists() {
+        std::fs::read_to_string(&config.html_footer_path)?
+    } else {
+        include_str!("../assets/html_footer.html").to_string()
+    };
 
     let mut html = String::new();
-    html.push_str(HTML_HEADER);
-    html.push_str(STYLES_CSS);
-    html.push_str(HTML_BODY_START);
+    html.push_str(&html_header);
+    html.push_str(&format!("<style>\n{}\n</style>", styles_css));
+    html.push_str(&html_body_start);
 
     for node in ast {
         html.push_str(&render_node(node));
         html.push('\n');
     }
 
-    html.push_str(HTML_FOOTER);
-    html
+    html.push_str(&html_footer);
+    Ok(html)
 }
 
-/// Write the AST as a full HTML document to `output/<filename>`.
+/// Write the AST as a full HTML document to the configured output directory.
 ///
 /// Creates the output directory if it does not exist.
 ///
 /// # Errors
 ///
-/// Returns `Box<dyn Error>` if directory creation or file writing fails.
-pub(crate) fn render_to_html_file(ast: &[Node], filename: &str) -> Result<(), Box<dyn Error>> {
-    let output_dir = PathBuf::from("output");
+/// Returns `Box<dyn Error>` if directory creation, template loading, or file writing fails.
+pub(crate) fn render_to_html_file(
+    ast: &[Node],
+    filename: &str,
+    config: &RendererConfig,
+) -> Result<(), Box<dyn Error>> {
+    let output_dir = PathBuf::from(&config.output_directory);
     create_dir_all(&output_dir)?;
 
     let file_path = output_dir.join(filename);
-    let html = render_to_html(ast);
+    let html = render_to_html(ast, config)?;
     let mut file = File::create(&file_path)?;
     file.write_all(html.as_bytes())?;
     Ok(())

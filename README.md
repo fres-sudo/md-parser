@@ -203,3 +203,37 @@ For example:
 
 - Ensuring all the tests passes.
 
+### Prompt 19 - Cursor (auto mode)
+
+Can you add a proper configuration file to this project?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the configuration file is created in the root of the project.
+- Ensuring the configuration file is named .env.
+- Ensuring the configuration file is named .env.example.
+- Ensuring the configuration file is named .env.example.
+
+### Prompt 20 - Cursor (auto mode)
+
+Can you add task lists (- [ ] and - [x]) to the parser?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains the files.
+- Ensuring new tests passes.
+
+### Prompt 21 - Cursor (auto mode)
+
+Can you add markdown tables in the parser?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains the files.
+- Ensuring new tests passes.
+
+### Prompt 22 - Cursor (auto mode)
+

@@ -1,19 +1,8 @@
 //! Markdown parsing logic.
 
-use crate::ast::{Inline, ListItem, Node, ParseError, Span};
+use crate::ast::{Alignment, Inline, ListItem, Node, ParseError, Span};
+use crate::config::ParserConfig;
 use regex::Regex;
-
-/// Maximum heading level supported (1-6)
-const MAX_HEADING_LEVEL: u8 = 6;
-
-/// Length of code block fence (```)
-const CODE_FENCE_LENGTH: usize = 3;
-
-/// Pattern for code block fence
-const CODE_FENCE_PATTERN: &str = "```";
-
-/// Language identifier for Mermaid diagrams
-const MERMAID_LANGUAGE: &str = "mermaid";
 
 /// Type of inline element match found during parsing
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,20 +38,31 @@ pub struct Parser {
     input: String,
     regex_patterns: RegexPatterns,
     warnings: Vec<String>,
+    config: ParserConfig,
 }
 
 impl Parser {
-    /// Create a new parser from a Markdown string
+    /// Create a new parser from a Markdown string with default configuration
     ///
     /// # Errors
     ///
     /// Returns `ParseError` if regex patterns fail to compile
     pub fn new(input: String) -> Result<Self, ParseError> {
+        Self::with_config(input, ParserConfig::default())
+    }
+
+    /// Create a new parser from a Markdown string with custom configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParseError` if regex patterns fail to compile
+    pub fn with_config(input: String, config: ParserConfig) -> Result<Self, ParseError> {
         let regex_patterns = RegexPatterns::new()?;
         Ok(Self {
             input,
             regex_patterns,
             warnings: Vec::new(),
+            config,
         })
     }
 
@@ -284,10 +284,14 @@ impl Parser {
     /// Parse a fenced code block starting at the given line index
     ///
     /// Returns the node and the new line index after the code block.
-    /// Errors with `UnclosedCodeBlock` if no closing ``` is found before EOF.
-    fn parse_code_block(lines: &[&str], start_idx: usize) -> Result<(Node, usize), ParseError> {
+    /// Errors with `UnclosedCodeBlock` if no closing fence is found before EOF.
+    fn parse_code_block(
+        &self,
+        lines: &[&str],
+        start_idx: usize,
+    ) -> Result<(Node, usize), ParseError> {
         let line = lines[start_idx].trim();
-        let lang_tag = line[CODE_FENCE_LENGTH..].trim();
+        let lang_tag = line[self.config.code_fence_length..].trim();
         let lang = if lang_tag.is_empty() {
             None
         } else {
@@ -299,7 +303,7 @@ impl Parser {
         let mut i = start_idx + 1;
         let mut is_closed = false;
         while i < lines.len() {
-            if lines[i].trim() == CODE_FENCE_PATTERN {
+            if lines[i].trim() == self.config.code_fence_pattern {
                 is_closed = true;
                 break;
             }
@@ -318,7 +322,8 @@ impl Parser {
         let code = code_lines.join("\n");
 
         // Special handling for Mermaid diagrams
-        let node = if lang.as_ref().map(|s| s.to_lowercase()) == Some(MERMAID_LANGUAGE.to_string())
+        let node = if lang.as_ref().map(|s| s.to_lowercase())
+            == Some(self.config.mermaid_language.to_lowercase())
         {
             Node::MermaidDiagram { diagram: code }
         } else {
@@ -338,7 +343,7 @@ impl Parser {
         }
 
         let level = line.chars().take_while(|&c| c == '#').count();
-        if level > MAX_HEADING_LEVEL as usize {
+        if level > self.config.max_heading_level as usize {
             let span = Span {
                 line: line_number,
                 column: None,
@@ -365,9 +370,10 @@ impl Parser {
 
     /// Check if a raw line (with indentation) matches the list pattern
     ///
-    /// Returns Some((indent_level, marker, content)) if it's a list line, None otherwise.
+    /// Returns Some((indent_level, marker, content, checked)) if it's a list line, None otherwise.
     /// Indent level is calculated as number of 2-space increments (0 = no indent, 1 = 2 spaces, etc.)
-    fn detect_list_line(line: &str) -> Option<(usize, char, &str)> {
+    /// checked is Some(bool) for task list items, None for regular list items.
+    fn detect_list_line(line: &str) -> Option<(usize, char, &str, Option<bool>)> {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             return None;
@@ -386,10 +392,36 @@ impl Parser {
         let leading_spaces = line[..marker_pos].chars().take_while(|&c| c == ' ').count();
         let indent_level = leading_spaces / 2;
 
-        // Extract content after marker and space
-        let content = line[marker_pos + 2..].trim();
+        // Check for task list pattern: - [ ] or - [x] or - [X]
+        // Only applies to '-' marker
+        if marker == '-' && marker_pos + 4 <= line.len() {
+            let after_marker = &line[marker_pos + 2..];
+            if after_marker.starts_with("[ ]") {
+                // Unchecked task: - [ ] content (or just - [ ])
+                if after_marker.len() == 3 {
+                    // Empty task: - [ ]
+                    return Some((indent_level, marker, "", Some(false)));
+                } else if after_marker.as_bytes()[3] == b' ' {
+                    // Task with content: - [ ] content
+                    let content = after_marker[4..].trim();
+                    return Some((indent_level, marker, content, Some(false)));
+                }
+            } else if after_marker.starts_with("[x]") || after_marker.starts_with("[X]") {
+                // Checked task: - [x] or - [X] content (or just - [x])
+                if after_marker.len() == 3 {
+                    // Empty task: - [x] or - [X]
+                    return Some((indent_level, marker, "", Some(true)));
+                } else if after_marker.as_bytes()[3] == b' ' {
+                    // Task with content: - [x] content
+                    let content = after_marker[4..].trim();
+                    return Some((indent_level, marker, content, Some(true)));
+                }
+            }
+        }
 
-        Some((indent_level, marker, content))
+        // Regular list item: extract content after marker and space
+        let content = line[marker_pos + 2..].trim();
+        Some((indent_level, marker, content, None))
     }
 
     /// Check if a line is a continuation line (indented, no marker)
@@ -412,8 +444,10 @@ impl Parser {
         }
 
         // Must not be a block element
+        // Note: This is a static method, so we can't access config here.
+        // We'll check for the default pattern "```" which is the standard.
         let trimmed = line.trim();
-        if trimmed.starts_with('#') || trimmed.starts_with(CODE_FENCE_PATTERN) {
+        if trimmed.starts_with('#') || trimmed.starts_with("```") {
             return None;
         }
 
@@ -446,12 +480,12 @@ impl Parser {
 
             // Check for block elements - end of list
             let trimmed = line.trim();
-            if trimmed.starts_with('#') || trimmed.starts_with(CODE_FENCE_PATTERN) {
+            if trimmed.starts_with('#') || trimmed.starts_with(&self.config.code_fence_pattern) {
                 break;
             }
 
             // Check if it's a list line
-            if let Some((indent_level, _marker, content)) = Self::detect_list_line(line) {
+            if let Some((indent_level, _marker, content, checked)) = Self::detect_list_line(line) {
                 // Parse the content as inline elements
                 let inline_content = if content.is_empty() {
                     Vec::new()
@@ -462,6 +496,7 @@ impl Parser {
                 let new_item = ListItem {
                     content: inline_content,
                     children: Vec::new(),
+                    checked,
                 };
 
                 // Truncate last_items to current indent level (we're going shallower or same)
@@ -578,6 +613,211 @@ impl Parser {
         Ok((Node::UnorderedList { items }, i))
     }
 
+    /// Check if a line is a table row (starts with | and contains at least one more |)
+    fn detect_table_row(line: &str) -> bool {
+        let trimmed = line.trim();
+        trimmed.starts_with('|') && trimmed[1..].contains('|')
+    }
+
+    /// Check if a line is a table separator (matches pattern like |:---|, |---:|, |:---:|, or |---|)
+    fn detect_table_separator(line: &str) -> bool {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('|') {
+            return false;
+        }
+
+        // Check if it matches the separator pattern: |:---|, |---:|, |:---:|, or |---|
+        // The separator must have at least 3 dashes between pipes
+        let parts: Vec<&str> = trimmed.split('|').collect();
+        if parts.len() < 2 {
+            return false;
+        }
+
+        // Check each cell separator (skip first and last empty parts)
+        for part in parts.iter().skip(1) {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            // Must be all dashes with optional colons at start/end
+            let has_colon_start = part.starts_with(':');
+            let has_colon_end = part.ends_with(':');
+            let dash_part = if has_colon_start && has_colon_end {
+                &part[1..part.len() - 1]
+            } else if has_colon_start {
+                &part[1..]
+            } else if has_colon_end {
+                &part[..part.len() - 1]
+            } else {
+                part
+            };
+
+            // Must have at least 3 dashes
+            if dash_part.len() < 3 || !dash_part.chars().all(|c| c == '-') {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Parse a table separator line and extract alignment information
+    ///
+    /// Returns a vector of alignment options (None = default/left, Some(Alignment) for explicit alignment)
+    fn parse_table_separator(line: &str) -> Vec<Option<Alignment>> {
+        let trimmed = line.trim();
+        let parts: Vec<&str> = trimmed.split('|').collect();
+        let mut alignments = Vec::new();
+
+        // Skip first empty part (before first |) and process the rest
+        for part in parts.iter().skip(1) {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+
+            let has_colon_start = part.starts_with(':');
+            let has_colon_end = part.ends_with(':');
+
+            let alignment = if has_colon_start && has_colon_end {
+                Some(Alignment::Center)
+            } else if has_colon_end {
+                Some(Alignment::Right)
+            } else if has_colon_start {
+                Some(Alignment::Left)
+            } else {
+                None // Default to left
+            };
+
+            alignments.push(alignment);
+        }
+
+        alignments
+    }
+
+    /// Parse a table row into cells, parsing inline content for each cell
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParseError` if inline parsing fails
+    fn parse_table_row(&self, line: &str) -> Result<Vec<Vec<Inline>>, ParseError> {
+        let trimmed = line.trim();
+        let parts: Vec<&str> = trimmed.split('|').collect();
+        let mut cells = Vec::new();
+
+        // When splitting by '|', if line starts with '|', first part is empty
+        // If line ends with '|', last part is empty
+        // We want to process all parts between the pipes
+        let start_idx = if !parts.is_empty() && parts[0].trim().is_empty() {
+            1
+        } else {
+            0
+        };
+        let end_idx = if !parts.is_empty() && parts[parts.len() - 1].trim().is_empty() {
+            parts.len() - 1
+        } else {
+            parts.len()
+        };
+
+        for part in &parts[start_idx..end_idx] {
+            let cell_content = part.trim();
+            let cell_inlines = if cell_content.is_empty() {
+                Vec::new()
+            } else {
+                self.parse_inline(cell_content)?
+            };
+            cells.push(cell_inlines);
+        }
+
+        Ok(cells)
+    }
+
+    /// Parse a table starting at the given line index
+    ///
+    /// Returns the node and the new line index after the table.
+    /// A table must have:
+    /// 1. A header row (starts with |)
+    /// 2. A separator row (matches separator pattern)
+    /// 3. Zero or more data rows (each starts with |)
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParseError` if parsing fails
+    fn parse_table(
+        &self,
+        lines: &[&str],
+        start_idx: usize,
+    ) -> Result<(Node, usize), ParseError> {
+        let mut i = start_idx;
+
+        // Parse header row
+        if !Self::detect_table_row(lines[i]) {
+            // Not a table - this shouldn't be called if not a table
+            return Err(ParseError::MalformedMarkdown {
+                message: "Expected table row".to_string(),
+                span: Span {
+                    line: i + 1,
+                    column: None,
+                },
+            });
+        }
+
+        let headers = self.parse_table_row(lines[i])?;
+        i += 1;
+
+        // Parse separator row
+        if i >= lines.len() || !Self::detect_table_separator(lines[i]) {
+            return Err(ParseError::MalformedMarkdown {
+                message: "Expected table separator row".to_string(),
+                span: Span {
+                    line: i + 1,
+                    column: None,
+                },
+            });
+        }
+
+        let alignments = Self::parse_table_separator(lines[i]);
+        i += 1;
+
+        // Parse data rows until a non-table line is encountered
+        let mut rows = Vec::new();
+        while i < lines.len() {
+            let line = lines[i].trim();
+
+            // Stop at empty line or block elements
+            if line.is_empty() {
+                break;
+            }
+            if line.starts_with('#') || line.starts_with(&self.config.code_fence_pattern) {
+                break;
+            }
+
+            // Stop at list lines
+            if Self::detect_list_line(lines[i]).is_some() {
+                break;
+            }
+
+            // Check if it's a table row
+            if Self::detect_table_row(lines[i]) {
+                let row = self.parse_table_row(lines[i])?;
+                rows.push(row);
+                i += 1;
+            } else {
+                // Not a table row, end of table
+                break;
+            }
+        }
+
+        Ok((
+            Node::Table {
+                headers,
+                rows,
+                alignments,
+            },
+            i,
+        ))
+    }
+
     /// Collect paragraph lines starting at the given index
     ///
     /// Returns the paragraph text and the new line index after the paragraph
@@ -592,12 +832,17 @@ impl Parser {
             if current_line.is_empty() {
                 break;
             }
-            if current_line.starts_with('#') || current_line.starts_with(CODE_FENCE_PATTERN) {
+            if current_line.starts_with('#') || current_line.starts_with(&self.config.code_fence_pattern) {
                 break;
             }
 
             // Stop at list lines (list parsing happens before paragraph collection)
             if Self::detect_list_line(lines[i]).is_some() {
+                break;
+            }
+
+            // Stop at table rows (table parsing happens before paragraph collection)
+            if Self::detect_table_row(lines[i]) {
                 break;
             }
 
@@ -631,9 +876,9 @@ impl Parser {
                 continue;
             }
 
-            // Check for fenced code blocks (```)
-            if line.starts_with(CODE_FENCE_PATTERN) {
-                let (node, new_idx) = Self::parse_code_block(&lines, i)?;
+            // Check for fenced code blocks
+            if line.starts_with(&self.config.code_fence_pattern) {
+                let (node, new_idx) = self.parse_code_block(&lines, i)?;
                 nodes.push(node);
                 i = new_idx;
                 continue;
@@ -653,6 +898,17 @@ impl Parser {
                 nodes.push(list_node);
                 i = new_idx;
                 continue;
+            }
+
+            // Check for tables (must check if current line is a table row and next line is separator)
+            if Self::detect_table_row(lines[i]) {
+                // Check if next line is a separator
+                if i + 1 < lines.len() && Self::detect_table_separator(lines[i + 1]) {
+                    let (table_node, new_idx) = self.parse_table(&lines, i)?;
+                    nodes.push(table_node);
+                    i = new_idx;
+                    continue;
+                }
             }
 
             // Collect paragraph lines (until empty line or block element)
