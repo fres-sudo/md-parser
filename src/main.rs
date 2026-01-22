@@ -43,7 +43,7 @@ Another paragraph with mixed formatting: **bold** and *italic* and a [link](http
     // Generate HTML file
     println!("\n\nGenerating HTML file...");
     match parser.to_html_file("output.html") {
-        Ok(_) => println!("✓ HTML file generated successfully: output.html"),
+        Ok(_) => println!("✓ HTML file generated successfully: output/output.html"),
         Err(e) => println!("✗ Error generating HTML file: {}", e),
     }
 }
