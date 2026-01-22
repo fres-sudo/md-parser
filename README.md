@@ -108,3 +108,7 @@ Go on with phase 3.
 ### Prompt 6 - Cursor (auto mode)
 
 Can you create a function that takes the json formatted AST and output an html  file so i can visualize the output?
+
+### Prompt 7 - Cursor (auto mode)
+
+Can you split tests in a separate folder to ensure good code structure?
