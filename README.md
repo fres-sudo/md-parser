@@ -178,3 +178,28 @@ Can you edit the parsing logic and handle also unclosed code blocks gracefully? 
 
 - Ensuring all the tests passes.
 
+### Prompt 17 - Cursor (auto mode)
+
+Can you improve the current error handling for the AST (in the @src/ast.rs file) in order to inclued error for:
+
+- invalid heading levels (>6)
+- malformed markdown structure
+- position/line information in errors of the input md file.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+
+### Prompt 18 - Cursor (auto mode)
+
+Can you improve the code quality and avoid hardcoded numbers and strings?
+For example:
+
+- hardcoded pattern for code blocks matching
+- hardcoded numbers for fence length (3 for exmpale)
+- String literals like "link", "bold" etc...used as match type -> use enum instead.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+

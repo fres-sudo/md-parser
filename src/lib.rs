@@ -8,7 +8,7 @@ mod ast;
 mod parser;
 mod renderer;
 
-pub use ast::{Inline, Node, ParseError};
+pub use ast::{Inline, Node, ParseError, Span};
 pub use parser::Parser;
 
 use std::error::Error;

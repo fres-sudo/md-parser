@@ -4,6 +4,24 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 
+/// Source location in the input (1-based line for user-facing messages).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Span {
+    /// 1-based line number
+    pub line: usize,
+    /// Optional 1-based column (when available)
+    pub column: Option<usize>,
+}
+
+impl fmt::Display for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.column {
+            Some(col) => write!(f, "line {}, column {}", self.line, col),
+            None => write!(f, "line {}", self.line),
+        }
+    }
+}
+
 /// Errors that can occur during parsing
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -13,6 +31,12 @@ pub enum ParseError {
     InvalidCaptureError(String),
     /// Error serializing AST to JSON
     SerializationError(String),
+    /// Heading with more than 6 `#` characters
+    InvalidHeadingLevel { level: u8, span: Span },
+    /// Code fence opened, EOF before closing ```
+    UnclosedCodeBlock { span: Span },
+    /// Generic structural issues (future use)
+    MalformedMarkdown { message: String, span: Span },
 }
 
 impl fmt::Display for ParseError {
@@ -26,6 +50,15 @@ impl fmt::Display for ParseError {
             }
             ParseError::SerializationError(msg) => {
                 write!(f, "Serialization error: {}", msg)
+            }
+            ParseError::InvalidHeadingLevel { level, span } => {
+                write!(f, "{}: invalid heading level {} (max 6)", span, level)
+            }
+            ParseError::UnclosedCodeBlock { span } => {
+                write!(f, "{}: unclosed code block", span)
+            }
+            ParseError::MalformedMarkdown { message, span } => {
+                write!(f, "{}: malformed markdown: {}", span, message)
             }
         }
     }

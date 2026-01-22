@@ -1,6 +1,6 @@
 //! Markdown parsing logic.
 
-use crate::ast::{Inline, ListItem, Node, ParseError};
+use crate::ast::{Inline, ListItem, Node, ParseError, Span};
 use regex::Regex;
 
 /// Maximum heading level supported (1-6)
@@ -264,12 +264,9 @@ impl Parser {
 
     /// Parse a fenced code block starting at the given line index
     ///
-    /// Returns the node and the new line index after the code block
-    fn parse_code_block(
-        lines: &[&str],
-        start_idx: usize,
-        warnings: &mut Vec<String>,
-    ) -> Result<(Node, usize), ParseError> {
+    /// Returns the node and the new line index after the code block.
+    /// Errors with `UnclosedCodeBlock` if no closing ``` is found before EOF.
+    fn parse_code_block(lines: &[&str], start_idx: usize) -> Result<(Node, usize), ParseError> {
         let line = lines[start_idx].trim();
         let lang_tag = line[3..].trim();
         let lang = if lang_tag.is_empty() {
@@ -291,13 +288,12 @@ impl Parser {
             i += 1;
         }
 
-        // Detect unclosed code block at EOF
         if !is_closed {
-            let line_number = start_idx + 1; // 1-indexed for user-friendly display
-            warnings.push(format!(
-                "Unclosed code block detected starting at line {}",
-                line_number
-            ));
+            let span = Span {
+                line: start_idx + 1,
+                column: None,
+            };
+            return Err(ParseError::UnclosedCodeBlock { span });
         }
 
         let code = code_lines.join("\n");
@@ -309,28 +305,31 @@ impl Parser {
             Node::CodeBlock { lang, code }
         };
 
-        // If unclosed, return the index after the last line (EOF)
-        // Otherwise, return index after the closing fence
-        let new_idx = if is_closed { i + 1 } else { i };
-
-        Ok((node, new_idx))
+        Ok((node, i + 1))
     }
 
     /// Parse a heading from a line
     ///
-    /// Returns Some(node) if a valid heading is found, None otherwise
-    fn parse_heading(&self, line: &str) -> Result<Option<Node>, ParseError> {
+    /// Returns `Some(node)` if a valid heading is found, `None` if not a heading.
+    /// Errors with `InvalidHeadingLevel` if the line has more than 6 leading `#`.
+    fn parse_heading(&self, line: &str, line_number: usize) -> Result<Option<Node>, ParseError> {
         if !line.starts_with('#') {
             return Ok(None);
         }
 
-        let mut level = 0;
-        let mut chars = line.chars();
-        while chars.next() == Some('#') && level < MAX_HEADING_LEVEL as usize {
-            level += 1;
+        let level = line.chars().take_while(|&c| c == '#').count();
+        if level > MAX_HEADING_LEVEL as usize {
+            let span = Span {
+                line: line_number,
+                column: None,
+            };
+            return Err(ParseError::InvalidHeadingLevel {
+                level: level as u8,
+                span,
+            });
         }
 
-        if level > 0 && level <= MAX_HEADING_LEVEL as usize {
+        if level > 0 {
             let content = line[level..].trim();
             if !content.is_empty() {
                 let inline_content = self.parse_inline(content)?;
@@ -614,14 +613,15 @@ impl Parser {
 
             // Check for fenced code blocks (```)
             if line.starts_with("```") {
-                let (node, new_idx) = Self::parse_code_block(&lines, i, &mut self.warnings)?;
+                let (node, new_idx) = Self::parse_code_block(&lines, i)?;
                 nodes.push(node);
                 i = new_idx;
                 continue;
             }
 
             // Check for headings (# syntax)
-            if let Some(heading_node) = self.parse_heading(line)? {
+            let line_number = i + 1;
+            if let Some(heading_node) = self.parse_heading(line, line_number)? {
                 nodes.push(heading_node);
                 i += 1;
                 continue;
