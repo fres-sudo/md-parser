@@ -326,3 +326,21 @@ Can you fix it?
 **Verification**:
 
 - Ensuring the CI is passing.
+
+### Prompt 31 - Perplexity AI
+
+Why am I getting this error?
+
+...CI output...
+
+in this CI pipeline?
+
+...CI content...
+
+Please fix it.
+
+**Verification**:
+
+- Ensuring the CI is passing.
+- Ensuring the output/ folder contains properly rendered blockquotes.
+- Ensuring new tests passes.
