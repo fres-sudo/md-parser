@@ -28,6 +28,9 @@ strong {
 em {
     font-style: italic;
 }
+del, s {
+    text-decoration: line-through;
+}
 a {
     color: #0366d6;
     text-decoration: none;
@@ -64,4 +67,27 @@ pre code {
 }
 li {
     margin-bottom: 8px;
+}
+ul, ol {
+    margin-bottom: 16px;
+    padding-left: 2em;
+}
+blockquote {
+    margin: 16px 0;
+    padding: 0 1em;
+    color: #6a737d;
+    border-left: 0.25em solid #dfe2e5;
+}
+table {
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    width: 100%;
+}
+table th, table td {
+    border: 1px solid #dfe2e5;
+    padding: 6px 13px;
+}
+table th {
+    background-color: #f6f8fa;
+    font-weight: 600;
 }

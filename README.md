@@ -294,3 +294,25 @@ Can you add a possibility to parse and render code blocks with different languag
 - Ensuring all the tests passes.
 - Ensuring the output/ folder contains properly rendered code blocks with different languages.
 - Ensuring new tests passes.
+
+### Prompt 28 - Cursor (auto mode)
+
+Currently the page is not beign stlyed at all, all the rules are not beign used, can u fix this?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly styled pages.
+- Ensuring new tests passes.
+
+### Prompt 29 - Cursor (auto mode)
+
+Can you add parsing and rendering logic for Blockquotes?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered blockquotes.
+- Ensuring new tests passes.
+
+### Prompt 30 - Cursor (auto mode)

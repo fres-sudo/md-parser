@@ -12,6 +12,7 @@ use std::collections::HashMap;
 enum InlineMatchType {
     Image,
     Link,
+    Strikethrough,
     Bold,
     Italic,
 }
@@ -23,6 +24,7 @@ struct RegexPatterns {
     /// Individual regexes for getting match positions and captures
     image: Regex,
     link: Regex,
+    strikethrough: Regex,
     bold: Regex,
     italic: Regex,
 }
@@ -30,14 +32,29 @@ struct RegexPatterns {
 impl RegexPatterns {
     /// Compile all regex patterns
     fn new() -> Result<Self, ParseError> {
+        // Pattern strings in order: image, link, strikethrough, bold, italic
+        let pattern_strings = [
+            r"!\[([^\]]*)\]\(([^)]+)\)",      // image
+            r"\[([^\]]+)\]\(([^)]+)\)",      // link
+            r"~~([^~]+?)~~",                  // strikethrough
+            r"\*\*((?:[^*]|\*[^*\n])+?)\*\*", // bold
+            r"\*([^*\n]+?)\*",               // italic
+        ];
+
+        let set = RegexSet::new(&pattern_strings)
+            .map_err(|e| ParseError::RegexCompilationError(format!("RegexSet compilation: {}", e)))?;
+
         Ok(RegexPatterns {
-            image: Regex::new(r"!\[([^\]]*)\]\(([^)]+)\)")
+            set,
+            image: Regex::new(pattern_strings[0])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Image regex: {}", e)))?,
-            link: Regex::new(r"\[([^\]]+)\]\(([^)]+)\)")
+            link: Regex::new(pattern_strings[1])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Link regex: {}", e)))?,
-            bold: Regex::new(r"\*\*((?:[^*]|\*[^*\n])+?)\*\*")
+            strikethrough: Regex::new(pattern_strings[2])
+                .map_err(|e| ParseError::RegexCompilationError(format!("Strikethrough regex: {}", e)))?,
+            bold: Regex::new(pattern_strings[3])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Bold regex: {}", e)))?,
-            italic: Regex::new(r"\*([^*\n]+?)\*")
+            italic: Regex::new(pattern_strings[4])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Italic regex: {}", e)))?,
         })
     }
@@ -117,7 +134,7 @@ impl MermaidValidator {
             let tv_content = &init_content[tv_start + "themeVariables:".len()..].trim();
             if let Some(tv_obj) = Self::extract_object(tv_content) {
                 let mut tv_map = HashMap::new();
-                
+
                 // Extract fontSize - try both with and without quotes in the extracted object
                 if let Some(fs) = Self::extract_string_value(&tv_obj, "fontSize") {
                     font_size = Some(fs.clone());
@@ -136,13 +153,13 @@ impl MermaidValidator {
                         }
                     }
                 }
-                
+
                 // Extract fontFamily
                 if let Some(ff) = Self::extract_string_value(&tv_obj, "fontFamily") {
                     font_family = Some(ff.clone());
                     tv_map.insert("fontFamily".to_string(), ff);
                 }
-                
+
                 if !tv_map.is_empty() {
                     theme_variables = Some(tv_map);
                 }
@@ -181,7 +198,7 @@ impl MermaidValidator {
                 }
             }
         }
-        
+
         // Fall back to double quotes
         let pattern_double = format!(
             "\"{}\"\\s*:\\s*\"([^\"]+)\"",
@@ -194,7 +211,7 @@ impl MermaidValidator {
                 }
             }
         }
-        
+
         // Try without quotes around key
         let pattern_no_quote_key = format!(
             "{}['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]",
@@ -207,7 +224,7 @@ impl MermaidValidator {
                 }
             }
         }
-        
+
         None
     }
 
@@ -481,48 +498,78 @@ impl Parser {
 
     /// Find the earliest match among all inline patterns
     fn find_earliest_match(&self, text: &str) -> Option<(usize, usize, InlineMatchType)> {
+        // Use RegexSet to quickly identify which patterns match
+        let matches = self.regex_patterns.set.matches(text);
+
+        // If no patterns match, return early
+        if !matches.matched_any() {
+            return None;
+        }
+
         let mut earliest_pos = text.len();
         let mut match_type = None;
         let mut match_range = (0, 0);
 
+        // Check patterns in priority order: image (0), link (1), strikethrough (2), bold (3), italic (4)
+        // Only check patterns that RegexSet identified as matching
+
         // Check for images (must check before links since images start with !)
-        if let Some(m) = self.regex_patterns.image.find(text) {
-            if m.start() < earliest_pos {
-                earliest_pos = m.start();
-                match_type = Some(InlineMatchType::Image);
-                match_range = (m.start(), m.end());
+        if matches.matched(0) {
+            if let Some(m) = self.regex_patterns.image.find(text) {
+                if m.start() < earliest_pos {
+                    earliest_pos = m.start();
+                    match_type = Some(InlineMatchType::Image);
+                    match_range = (m.start(), m.end());
+                }
             }
         }
 
         // Check for links
-        if let Some(m) = self.regex_patterns.link.find(text) {
-            if m.start() < earliest_pos {
-                earliest_pos = m.start();
-                match_type = Some(InlineMatchType::Link);
-                match_range = (m.start(), m.end());
+        if matches.matched(1) {
+            if let Some(m) = self.regex_patterns.link.find(text) {
+                if m.start() < earliest_pos {
+                    earliest_pos = m.start();
+                    match_type = Some(InlineMatchType::Link);
+                    match_range = (m.start(), m.end());
+                }
+            }
+        }
+
+        // Check for strikethrough (must check before bold/italic to avoid conflicts)
+        if matches.matched(2) {
+            if let Some(m) = self.regex_patterns.strikethrough.find(text) {
+                if m.start() < earliest_pos {
+                    earliest_pos = m.start();
+                    match_type = Some(InlineMatchType::Strikethrough);
+                    match_range = (m.start(), m.end());
+                }
             }
         }
 
         // Check for bold (must check before italic to avoid conflicts)
-        if let Some(m) = self.regex_patterns.bold.find(text) {
-            if m.start() < earliest_pos {
-                earliest_pos = m.start();
-                match_type = Some(InlineMatchType::Bold);
-                match_range = (m.start(), m.end());
+        if matches.matched(3) {
+            if let Some(m) = self.regex_patterns.bold.find(text) {
+                if m.start() < earliest_pos {
+                    earliest_pos = m.start();
+                    match_type = Some(InlineMatchType::Bold);
+                    match_range = (m.start(), m.end());
+                }
             }
         }
 
         // Check for italic (only if not part of bold - check that it's not **)
-        if let Some(m) = self.regex_patterns.italic.find(text) {
-            let start = m.start();
-            let end = m.end();
-            // Make sure it's not part of bold (check for ** before or after)
-            let is_bold = (start > 0 && text.as_bytes()[start - 1] == b'*')
-                || (end < text.len() && text.as_bytes()[end] == b'*');
+        if matches.matched(4) {
+            if let Some(m) = self.regex_patterns.italic.find(text) {
+                let start = m.start();
+                let end = m.end();
+                // Make sure it's not part of bold (check for ** before or after)
+                let is_bold = (start > 0 && text.as_bytes()[start - 1] == b'*')
+                    || (end < text.len() && text.as_bytes()[end] == b'*');
 
-            if !is_bold && start < earliest_pos {
-                match_type = Some(InlineMatchType::Italic);
-                match_range = (start, end);
+                if !is_bold && start < earliest_pos {
+                    match_type = Some(InlineMatchType::Italic);
+                    match_range = (start, end);
+                }
             }
         }
 
@@ -665,6 +712,47 @@ impl Parser {
         Ok(&remaining[match_range.1..])
     }
 
+    /// Process a strikethrough match and add it to inlines
+    fn process_strikethrough_match<'a>(
+        &self,
+        remaining: &'a str,
+        match_range: (usize, usize),
+        inlines: &mut Vec<Inline>,
+    ) -> Result<&'a str, ParseError> {
+        // Add text before the strikethrough
+        if match_range.0 > 0 {
+            let text_before = &remaining[..match_range.0];
+            if !text_before.is_empty() {
+                inlines.push(Inline::Text {
+                    content: text_before.to_string(),
+                });
+            }
+        }
+
+        let match_text = &remaining[match_range.0..match_range.1];
+        let caps = self
+            .regex_patterns
+            .strikethrough
+            .captures(match_text)
+            .ok_or_else(|| {
+                ParseError::InvalidCaptureError("Failed to capture strikethrough groups".to_string())
+            })?;
+
+        let strikethrough_text = caps
+            .get(1)
+            .ok_or_else(|| {
+                ParseError::InvalidCaptureError("Failed to capture strikethrough text".to_string())
+            })?
+            .as_str();
+
+        let strikethrough_inlines = self.parse_inline(strikethrough_text)?;
+        inlines.push(Inline::Strikethrough {
+            content: strikethrough_inlines,
+        });
+
+        Ok(&remaining[match_range.1..])
+    }
+
     /// Process an italic match and add it to inlines
     fn process_italic_match<'a>(
         &self,
@@ -724,6 +812,9 @@ impl Parser {
                     }
                     InlineMatchType::Link => {
                         self.process_link_match(remaining, match_range, &mut inlines)?
+                    }
+                    InlineMatchType::Strikethrough => {
+                        self.process_strikethrough_match(remaining, match_range, &mut inlines)?
                     }
                     InlineMatchType::Bold => {
                         self.process_bold_match(remaining, match_range, &mut inlines)?
@@ -1167,6 +1258,140 @@ impl Parser {
         true
     }
 
+    /// Check if a line is a blockquote and return its nesting level
+    ///
+    /// Returns `Some(level)` if the line starts with one or more `>` characters,
+    /// where level is the number of `>` characters (1 for `>`, 2 for `>>`, etc.).
+    /// Returns `None` if the line is not a blockquote.
+    fn detect_blockquote_line(line: &str) -> Option<u8> {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        // Count leading `>` characters
+        let level = trimmed.chars().take_while(|&c| c == '>').count();
+        if level > 0 {
+            Some(level as u8)
+        } else {
+            None
+        }
+    }
+
+    /// Collect blockquote lines starting at the given index
+    ///
+    /// Returns the blockquote text (with `>` prefixes stripped) and the new line index after the blockquote.
+    /// Stops when encountering an empty line, a different nesting level, or other block elements.
+    fn collect_blockquote_lines(&self, lines: &[&str], start_idx: usize) -> (String, usize) {
+        let mut blockquote_lines = Vec::new();
+        let mut i = start_idx;
+
+        // Get the nesting level from the first line
+        let nesting_level = match Self::detect_blockquote_line(lines[i]) {
+            Some(level) => level,
+            None => return (String::new(), i), // Not a blockquote line
+        };
+
+        while i < lines.len() {
+            let current_line = lines[i].trim();
+
+            // Stop at empty line
+            if current_line.is_empty() {
+                break;
+            }
+
+            // Stop at other block elements
+            if current_line.starts_with('#')
+                || current_line.starts_with(&self.config.code_fence_pattern)
+            {
+                break;
+            }
+
+            // Stop at list lines
+            if Self::detect_list_line(lines[i]).is_some() {
+                break;
+            }
+
+            // Stop at table rows
+            if Self::detect_table_row(lines[i]) {
+                break;
+            }
+
+            // Check if it's a blockquote line at the same nesting level
+            if let Some(level) = Self::detect_blockquote_line(lines[i]) {
+                if level == nesting_level {
+                    // Strip the `>` prefix and optional space
+                    let content = lines[i]
+                        .trim_start()
+                        .chars()
+                        .skip(level as usize)
+                        .collect::<String>()
+                        .trim_start()
+                        .to_string();
+                    blockquote_lines.push(content);
+                    i += 1;
+                } else {
+                    // Different nesting level, end this blockquote
+                    break;
+                }
+            } else {
+                // Not a blockquote line, end the blockquote
+                break;
+            }
+        }
+
+        let blockquote_text = blockquote_lines.join(" ");
+        (blockquote_text, i)
+    }
+
+    /// Parse a blockquote starting at the given line index
+    ///
+    /// Returns the blockquote node and the new line index after the blockquote.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParseError` if inline parsing fails
+    fn parse_blockquote(&self, lines: &[&str], start_idx: usize) -> Result<(Node, usize), ParseError> {
+        // Detect nesting level from first line
+        let level = match Self::detect_blockquote_line(lines[start_idx]) {
+            Some(l) => l,
+            None => {
+                return Err(ParseError::MalformedMarkdown {
+                    message: "Expected blockquote line".to_string(),
+                    span: Span {
+                        line: start_idx + 1,
+                        column: None,
+                    },
+                });
+            }
+        };
+
+        // Collect blockquote lines
+        let (blockquote_text, new_idx) = self.collect_blockquote_lines(lines, start_idx);
+
+        if blockquote_text.is_empty() {
+            // Empty blockquote - skip it
+            return Ok((
+                Node::Blockquote {
+                    level,
+                    content: Vec::new(),
+                },
+                new_idx,
+            ));
+        }
+
+        // Parse inline content
+        let inline_content = self.parse_inline(&blockquote_text)?;
+
+        Ok((
+            Node::Blockquote {
+                level,
+                content: inline_content,
+            },
+            new_idx,
+        ))
+    }
+
     /// Parse a table separator line and extract alignment information
     ///
     /// Returns a vector of alignment options (None = default/left, Some(Alignment) for explicit alignment)
@@ -1350,6 +1575,11 @@ impl Parser {
                 break;
             }
 
+            // Stop at blockquote lines (blockquote parsing happens before paragraph collection)
+            if Self::detect_blockquote_line(lines[i]).is_some() {
+                break;
+            }
+
             para_lines.push(current_line);
             i += 1;
         }
@@ -1414,6 +1644,14 @@ impl Parser {
                     i = new_idx;
                     continue;
                 }
+            }
+
+            // Check for blockquotes
+            if Self::detect_blockquote_line(lines[i]).is_some() {
+                let (blockquote_node, new_idx) = self.parse_blockquote(&lines, i)?;
+                nodes.push(blockquote_node);
+                i = new_idx;
+                continue;
             }
 
             // Collect paragraph lines (until empty line or block element)

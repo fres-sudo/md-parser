@@ -29,6 +29,10 @@ fn render_inline(inline: &Inline) -> String {
             let inner: String = content.iter().map(render_inline).collect();
             format!("<em>{}</em>", inner)
         }
+        Inline::Strikethrough { content } => {
+            let inner: String = content.iter().map(render_inline).collect();
+            format!("<del>{}</del>", inner)
+        }
         Inline::Link { text, url } => {
             let link_text: String = text.iter().map(render_inline).collect();
             format!("<a href=\"{}\">{}</a>", escape_html(url), link_text)
@@ -209,6 +213,19 @@ fn render_node(node: &Node) -> String {
                 html.push_str("</tr>");
             }
             html.push_str("</tbody>\n</table>");
+            html
+        }
+        Node::Blockquote { level, content } => {
+            let inner: String = content.iter().map(render_inline).collect();
+            // For nested blockquotes, nest multiple <blockquote> elements
+            let mut html = String::new();
+            for _ in 0..*level {
+                html.push_str("<blockquote>");
+            }
+            html.push_str(&inner);
+            for _ in 0..*level {
+                html.push_str("</blockquote>");
+            }
             html
         }
     }

@@ -92,6 +92,9 @@ pub enum Inline {
     /// Italic text (*text*)
     #[serde(rename = "italic")]
     Italic { content: Vec<Inline> },
+    /// Strikethrough text (~~text~~)
+    #[serde(rename = "strikethrough")]
+    Strikethrough { content: Vec<Inline> },
     /// Link [text](url)
     #[serde(rename = "link")]
     Link { text: Vec<Inline>, url: String },
@@ -180,5 +183,13 @@ pub enum Node {
         rows: Vec<Vec<Vec<Inline>>>,
         /// Column alignments (None = default/left, Some(Alignment) for explicit alignment)
         alignments: Vec<Option<Alignment>>,
+    },
+    /// A blockquote with nesting level and content
+    #[serde(rename = "blockquote")]
+    Blockquote {
+        /// Nesting depth (1 for `>`, 2 for `>>`, etc.)
+        level: u8,
+        /// Parsed inline content (supports bold, italic, links, etc.)
+        content: Vec<Inline>,
     },
 }
