@@ -154,7 +154,6 @@ The parser supports the following Markdown features:
 
 The following common Markdown features are **not currently supported**:
 
-- **Ordered lists** (numbered lists: `1.`, `2.`, etc.)
 - **Horizontal rules** (`---` or `***`)
 - **Inline code** (backticks: `` `code` ``)
 - **HTML tags** and entities
@@ -167,25 +166,23 @@ The following common Markdown features are **not currently supported**:
 
 ## Known Limitations
 
-1. **Ordered Lists**: Numbered lists are not supported. Only unordered lists with `-`, `*`, or `+` markers are parsed.
+1. **Inline Code**: Inline code spans using backticks are not parsed. Only fenced code blocks are supported.
 
-2. **Inline Code**: Inline code spans using backticks are not parsed. Only fenced code blocks are supported.
+2. **HTML Support**: The parser does not parse or render HTML tags embedded in Markdown. All HTML is treated as plain text.
 
-3. **HTML Support**: The parser does not parse or render HTML tags embedded in Markdown. All HTML is treated as plain text.
+3. **Reference-Style Links**: Only inline-style links `[text](url)` are supported. Reference-style links `[text][ref]` with definitions are not supported.
 
-4. **Reference-Style Links**: Only inline-style links `[text](url)` are supported. Reference-style links `[text][ref]` with definitions are not supported.
+4. **Nested Inline Elements**: While the parser supports nested inline elements (e.g., bold within italic), complex nesting scenarios may not always parse correctly.
 
-5. **Nested Inline Elements**: While the parser supports nested inline elements (e.g., bold within italic), complex nesting scenarios may not always parse correctly.
+5. **Code Block Fence Length**: The parser is configured to use 3 backticks for code fences. Different fence lengths are not supported.
 
-6. **Code Block Fence Length**: The parser is configured to use 3 backticks for code fences. Different fence lengths are not supported.
+6. **Mermaid Validation**: Mermaid syntax validation is basic and may not catch all syntax errors. Full validation would require the Mermaid CLI tool.
 
-7. **Mermaid Validation**: Mermaid syntax validation is basic and may not catch all syntax errors. Full validation would require the Mermaid CLI tool.
+7. **Table Parsing**: Tables must have proper alignment rows. Malformed tables may not parse correctly.
 
-8. **Table Parsing**: Tables must have proper alignment rows. Malformed tables may not parse correctly.
+8. **Blockquote Nesting**: While nested blockquotes are supported, very deep nesting (more than 3-4 levels) may not render correctly.
 
-9. **Blockquote Nesting**: While nested blockquotes are supported, very deep nesting (more than 3-4 levels) may not render correctly.
-
-10. **Performance**: The parser uses a single-pass approach with regex matching. Very large documents (10,000+ lines) may experience slower parsing times.
+9. **Performance**: The parser uses a single-pass approach with regex matching. Very large documents (10,000+ lines) may experience slower parsing times.
 
 ## Performance Characteristics
 
