@@ -344,3 +344,15 @@ Please fix it.
 - Ensuring the CI is passing.
 - Ensuring the output/ folder contains properly rendered blockquotes.
 - Ensuring new tests passes.
+
+### Prompt 32 - Cursor (auto mode)
+
+I am getting this error in the CI. Can you help?
+
+...CI output...
+
+**Verification**:
+
+- Ensuring the CI is passing.
+- Ensuring the output/ folder contains properly rendered blockquotes.
+- Ensuring new tests passes.

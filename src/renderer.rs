@@ -2,7 +2,6 @@
 
 use crate::ast::{Alignment, Inline, ListItem, Node, ValidationStatus};
 use crate::config::RendererConfig;
-use serde_json;
 use std::error::Error;
 use std::fs::{create_dir_all, File};
 use std::io::Write;

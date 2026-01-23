@@ -41,7 +41,7 @@ impl RegexPatterns {
             r"\*([^*\n]+?)\*",                // italic
         ];
 
-        let set = RegexSet::new(&pattern_strings).map_err(|e| {
+        let set = RegexSet::new(pattern_strings).map_err(|e| {
             ParseError::RegexCompilationError(format!("RegexSet compilation: {}", e))
         })?;
 
