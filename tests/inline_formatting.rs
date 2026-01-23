@@ -131,17 +131,56 @@ fn test_nested_bold_italic() {
     assert_eq!(result.len(), 1);
     match &result[0] {
         Node::Paragraph { content: inlines } => {
-            // Should have at least "This is " text and a Bold element
-            assert!(!inlines.is_empty());
-            // Check that we have a Bold element somewhere
-            let has_bold = inlines
-                .iter()
-                .any(|inline| matches!(inline, Inline::Bold { .. }));
-            assert!(has_bold, "Expected at least one Bold element");
-            // If we have text before bold, verify it
-            if let Some(Inline::Text { content }) = inlines.first() {
-                assert!(content.contains("This is") || content.is_empty());
+            // Should have: "This is ", bold, "."
+            assert_eq!(inlines.len(), 3);
+            assert_eq!(
+                inlines[0],
+                Inline::Text {
+                    content: "This is ".to_string()
+                }
+            );
+            match &inlines[1] {
+                Inline::Bold {
+                    content: bold_inlines,
+                } => {
+                    // Should have: "bold with ", italic, " inside"
+                    assert_eq!(bold_inlines.len(), 3);
+                    assert_eq!(
+                        bold_inlines[0],
+                        Inline::Text {
+                            content: "bold with ".to_string()
+                        }
+                    );
+                    // Verify italic is nested inside bold
+                    match &bold_inlines[1] {
+                        Inline::Italic {
+                            content: italic_inlines,
+                        } => {
+                            assert_eq!(italic_inlines.len(), 1);
+                            assert_eq!(
+                                italic_inlines[0],
+                                Inline::Text {
+                                    content: "italic".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Italic nested inside Bold"),
+                    }
+                    assert_eq!(
+                        bold_inlines[2],
+                        Inline::Text {
+                            content: " inside".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Bold"),
             }
+            assert_eq!(
+                inlines[2],
+                Inline::Text {
+                    content: ".".to_string()
+                }
+            );
         }
         _ => panic!("Expected Paragraph"),
     }
@@ -323,5 +362,363 @@ fn test_image_in_heading() {
             assert!(has_image, "Expected Image element in heading");
         }
         _ => panic!("Expected Heading"),
+    }
+}
+
+#[test]
+fn test_bold_with_italic_inside() {
+    let input = "**bold *italic* text**".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Bold {
+                    content: bold_inlines,
+                } => {
+                    assert_eq!(bold_inlines.len(), 3);
+                    assert_eq!(
+                        bold_inlines[0],
+                        Inline::Text {
+                            content: "bold ".to_string()
+                        }
+                    );
+                    match &bold_inlines[1] {
+                        Inline::Italic {
+                            content: italic_inlines,
+                        } => {
+                            assert_eq!(italic_inlines.len(), 1);
+                            assert_eq!(
+                                italic_inlines[0],
+                                Inline::Text {
+                                    content: "italic".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Italic nested inside Bold"),
+                    }
+                    assert_eq!(
+                        bold_inlines[2],
+                        Inline::Text {
+                            content: " text".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Bold"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_italic_with_bold_inside() {
+    let input = "*italic **bold** text*".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Italic {
+                    content: italic_inlines,
+                } => {
+                    assert_eq!(italic_inlines.len(), 3);
+                    assert_eq!(
+                        italic_inlines[0],
+                        Inline::Text {
+                            content: "italic ".to_string()
+                        }
+                    );
+                    match &italic_inlines[1] {
+                        Inline::Bold {
+                            content: bold_inlines,
+                        } => {
+                            assert_eq!(bold_inlines.len(), 1);
+                            assert_eq!(
+                                bold_inlines[0],
+                                Inline::Text {
+                                    content: "bold".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Bold nested inside Italic"),
+                    }
+                    assert_eq!(
+                        italic_inlines[2],
+                        Inline::Text {
+                            content: " text".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Italic"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_bold_with_multiple_italic_inside() {
+    let input = "**bold *italic* and *more italic* text**".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Bold {
+                    content: bold_inlines,
+                } => {
+                    // Should have: "bold ", italic, " and ", italic, " text"
+                    assert_eq!(bold_inlines.len(), 5);
+                    assert_eq!(
+                        bold_inlines[0],
+                        Inline::Text {
+                            content: "bold ".to_string()
+                        }
+                    );
+                    // First italic
+                    match &bold_inlines[1] {
+                        Inline::Italic {
+                            content: italic_inlines,
+                        } => {
+                            assert_eq!(italic_inlines.len(), 1);
+                            assert_eq!(
+                                italic_inlines[0],
+                                Inline::Text {
+                                    content: "italic".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Italic nested inside Bold"),
+                    }
+                    assert_eq!(
+                        bold_inlines[2],
+                        Inline::Text {
+                            content: " and ".to_string()
+                        }
+                    );
+                    // Second italic
+                    match &bold_inlines[3] {
+                        Inline::Italic {
+                            content: italic_inlines,
+                        } => {
+                            assert_eq!(italic_inlines.len(), 1);
+                            assert_eq!(
+                                italic_inlines[0],
+                                Inline::Text {
+                                    content: "more italic".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Italic nested inside Bold"),
+                    }
+                    assert_eq!(
+                        bold_inlines[4],
+                        Inline::Text {
+                            content: " text".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Bold"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_italic_with_bold_inside_complex() {
+    let input = "*italic **bold** and **more bold** text*".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Italic {
+                    content: italic_inlines,
+                } => {
+                    // Should have: "italic ", bold, " and ", bold, " text"
+                    assert_eq!(italic_inlines.len(), 5);
+                    assert_eq!(
+                        italic_inlines[0],
+                        Inline::Text {
+                            content: "italic ".to_string()
+                        }
+                    );
+                    // First bold
+                    match &italic_inlines[1] {
+                        Inline::Bold {
+                            content: bold_inlines,
+                        } => {
+                            assert_eq!(bold_inlines.len(), 1);
+                            assert_eq!(
+                                bold_inlines[0],
+                                Inline::Text {
+                                    content: "bold".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Bold nested inside Italic"),
+                    }
+                    assert_eq!(
+                        italic_inlines[2],
+                        Inline::Text {
+                            content: " and ".to_string()
+                        }
+                    );
+                    // Second bold
+                    match &italic_inlines[3] {
+                        Inline::Bold {
+                            content: bold_inlines,
+                        } => {
+                            assert_eq!(bold_inlines.len(), 1);
+                            assert_eq!(
+                                bold_inlines[0],
+                                Inline::Text {
+                                    content: "more bold".to_string()
+                                }
+                            );
+                        }
+                        _ => panic!("Expected Bold nested inside Italic"),
+                    }
+                    assert_eq!(
+                        italic_inlines[4],
+                        Inline::Text {
+                            content: " text".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Italic"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_multiple_nested_formats() {
+    let input = "Start **bold *italic* text** and *italic **bold** text* end.".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            // Should have: "Start ", bold (with italic), " and ", italic (with bold), " end."
+            assert!(inlines.len() >= 5);
+            assert_eq!(
+                inlines[0],
+                Inline::Text {
+                    content: "Start ".to_string()
+                }
+            );
+            // First bold with italic
+            match &inlines[1] {
+                Inline::Bold {
+                    content: bold_inlines,
+                } => {
+                    let has_italic = bold_inlines
+                        .iter()
+                        .any(|inline| matches!(inline, Inline::Italic { .. }));
+                    assert!(has_italic, "Expected Italic nested inside first Bold");
+                }
+                _ => panic!("Expected Bold"),
+            }
+            assert_eq!(
+                inlines[2],
+                Inline::Text {
+                    content: " and ".to_string()
+                }
+            );
+            // Italic with bold
+            match &inlines[3] {
+                Inline::Italic {
+                    content: italic_inlines,
+                } => {
+                    let has_bold = italic_inlines
+                        .iter()
+                        .any(|inline| matches!(inline, Inline::Bold { .. }));
+                    assert!(has_bold, "Expected Bold nested inside Italic");
+                }
+                _ => panic!("Expected Italic"),
+            }
+            assert_eq!(
+                inlines[4],
+                Inline::Text {
+                    content: " end.".to_string()
+                }
+            );
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_simple_bold_no_nesting() {
+    let input = "This is **bold** text.".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 3);
+            match &inlines[1] {
+                Inline::Bold {
+                    content: bold_inlines,
+                } => {
+                    assert_eq!(bold_inlines.len(), 1);
+                    assert_eq!(
+                        bold_inlines[0],
+                        Inline::Text {
+                            content: "bold".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Bold"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_simple_italic_no_nesting() {
+    let input = "This is *italic* text.".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 3);
+            match &inlines[1] {
+                Inline::Italic {
+                    content: italic_inlines,
+                } => {
+                    assert_eq!(italic_inlines.len(), 1);
+                    assert_eq!(
+                        italic_inlines[0],
+                        Inline::Text {
+                            content: "italic".to_string()
+                        }
+                    );
+                }
+                _ => panic!("Expected Italic"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
     }
 }

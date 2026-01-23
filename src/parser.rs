@@ -34,11 +34,11 @@ impl RegexPatterns {
     fn new() -> Result<Self, ParseError> {
         // Pattern strings in order: image, link, strikethrough, bold, italic
         let pattern_strings = [
-            r"!\[([^\]]*)\]\(([^)]+)\)",      // image
-            r"\[([^\]]+)\]\(([^)]+)\)",       // link
-            r"~~([^~]+?)~~",                  // strikethrough
-            r"\*\*((?:[^*]|\*[^*\n])+?)\*\*", // bold
-            r"\*([^*\n]+?)\*",                // italic
+            r"!\[([^\]]*)\]\(([^)]+)\)",    // image
+            r"\[([^\]]+)\]\(([^)]+)\)",     // link
+            r"~~([^~]+?)~~",                // strikethrough
+            r"\*\*((?:[^*]|\*[^*])+?)\*\*", // bold - allows * (for italic) but not ** inside
+            r"\*((?:[^*]|\*\*)+)\*", // italic - allows ** (for bold) inside, greedy to match full span
         ];
 
         let set = RegexSet::new(pattern_strings).map_err(|e| {
