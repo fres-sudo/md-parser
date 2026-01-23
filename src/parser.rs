@@ -35,14 +35,15 @@ impl RegexPatterns {
         // Pattern strings in order: image, link, strikethrough, bold, italic
         let pattern_strings = [
             r"!\[([^\]]*)\]\(([^)]+)\)",      // image
-            r"\[([^\]]+)\]\(([^)]+)\)",      // link
+            r"\[([^\]]+)\]\(([^)]+)\)",       // link
             r"~~([^~]+?)~~",                  // strikethrough
             r"\*\*((?:[^*]|\*[^*\n])+?)\*\*", // bold
-            r"\*([^*\n]+?)\*",               // italic
+            r"\*([^*\n]+?)\*",                // italic
         ];
 
-        let set = RegexSet::new(&pattern_strings)
-            .map_err(|e| ParseError::RegexCompilationError(format!("RegexSet compilation: {}", e)))?;
+        let set = RegexSet::new(&pattern_strings).map_err(|e| {
+            ParseError::RegexCompilationError(format!("RegexSet compilation: {}", e))
+        })?;
 
         Ok(RegexPatterns {
             set,
@@ -50,8 +51,9 @@ impl RegexPatterns {
                 .map_err(|e| ParseError::RegexCompilationError(format!("Image regex: {}", e)))?,
             link: Regex::new(pattern_strings[1])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Link regex: {}", e)))?,
-            strikethrough: Regex::new(pattern_strings[2])
-                .map_err(|e| ParseError::RegexCompilationError(format!("Strikethrough regex: {}", e)))?,
+            strikethrough: Regex::new(pattern_strings[2]).map_err(|e| {
+                ParseError::RegexCompilationError(format!("Strikethrough regex: {}", e))
+            })?,
             bold: Regex::new(pattern_strings[3])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Bold regex: {}", e)))?,
             italic: Regex::new(pattern_strings[4])
@@ -187,10 +189,7 @@ impl MermaidValidator {
     /// Looks for patterns like 'key':'value' or "key":"value"
     fn extract_string_value(content: &str, key: &str) -> Option<String> {
         // Try with single quotes first (more common in Mermaid config)
-        let pattern_single = format!(
-            "'{}'\\s*:\\s*'([^']+)'",
-            regex::escape(key)
-        );
+        let pattern_single = format!("'{}'\\s*:\\s*'([^']+)'", regex::escape(key));
         if let Ok(re) = Regex::new(&pattern_single) {
             if let Some(caps) = re.captures(content) {
                 if let Some(m) = caps.get(1) {
@@ -200,10 +199,7 @@ impl MermaidValidator {
         }
 
         // Fall back to double quotes
-        let pattern_double = format!(
-            "\"{}\"\\s*:\\s*\"([^\"]+)\"",
-            regex::escape(key)
-        );
+        let pattern_double = format!("\"{}\"\\s*:\\s*\"([^\"]+)\"", regex::escape(key));
         if let Ok(re) = Regex::new(&pattern_double) {
             if let Some(caps) = re.captures(content) {
                 if let Some(m) = caps.get(1) {
@@ -213,10 +209,8 @@ impl MermaidValidator {
         }
 
         // Try without quotes around key
-        let pattern_no_quote_key = format!(
-            "{}['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]",
-            regex::escape(key)
-        );
+        let pattern_no_quote_key =
+            format!("{}['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]", regex::escape(key));
         if let Ok(re) = Regex::new(&pattern_no_quote_key) {
             if let Some(caps) = re.captures(content) {
                 if let Some(m) = caps.get(1) {
@@ -735,7 +729,9 @@ impl Parser {
             .strikethrough
             .captures(match_text)
             .ok_or_else(|| {
-                ParseError::InvalidCaptureError("Failed to capture strikethrough groups".to_string())
+                ParseError::InvalidCaptureError(
+                    "Failed to capture strikethrough groups".to_string(),
+                )
             })?;
 
         let strikethrough_text = caps
@@ -1351,7 +1347,11 @@ impl Parser {
     /// # Errors
     ///
     /// Returns `ParseError` if inline parsing fails
-    fn parse_blockquote(&self, lines: &[&str], start_idx: usize) -> Result<(Node, usize), ParseError> {
+    fn parse_blockquote(
+        &self,
+        lines: &[&str],
+        start_idx: usize,
+    ) -> Result<(Node, usize), ParseError> {
         // Detect nesting level from first line
         let level = match Self::detect_blockquote_line(lines[start_idx]) {
             Some(l) => l,

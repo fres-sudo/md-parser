@@ -117,7 +117,8 @@ fn test_javascript_code_block() {
 
 #[test]
 fn test_typescript_code_block() {
-    let input = "```typescript\ninterface User {\n    name: string;\n    age: number;\n}\n```".to_string();
+    let input =
+        "```typescript\ninterface User {\n    name: string;\n    age: number;\n}\n```".to_string();
     let mut parser = Parser::new(input).unwrap();
     let result = parser.parse().unwrap();
 
@@ -125,7 +126,10 @@ fn test_typescript_code_block() {
     match &result[0] {
         Node::CodeBlock { lang, code } => {
             assert_eq!(lang.as_ref(), Some(&"typescript".to_string()));
-            assert_eq!(code, "interface User {\n    name: string;\n    age: number;\n}");
+            assert_eq!(
+                code,
+                "interface User {\n    name: string;\n    age: number;\n}"
+            );
         }
         _ => panic!("Expected CodeBlock, got {:?}", result[0]),
     }
@@ -154,7 +158,10 @@ fn test_multiple_language_code_blocks() {
             assert_eq!(lang.as_ref(), Some(&"python".to_string()));
             assert_eq!(code, "def main():\n    pass");
         }
-        _ => panic!("Second block should be Python CodeBlock, got {:?}", result[1]),
+        _ => panic!(
+            "Second block should be Python CodeBlock, got {:?}",
+            result[1]
+        ),
     }
 
     // Third block: JavaScript
@@ -163,6 +170,9 @@ fn test_multiple_language_code_blocks() {
             assert_eq!(lang.as_ref(), Some(&"javascript".to_string()));
             assert_eq!(code, "function main() {}");
         }
-        _ => panic!("Third block should be JavaScript CodeBlock, got {:?}", result[2]),
+        _ => panic!(
+            "Third block should be JavaScript CodeBlock, got {:?}",
+            result[2]
+        ),
     }
 }

@@ -316,3 +316,13 @@ Can you add parsing and rendering logic for Blockquotes?
 - Ensuring new tests passes.
 
 ### Prompt 30 - Cursor (auto mode)
+
+I am getting this error in the CI.
+
+...CI output...
+
+Can you fix it?
+
+**Verification**:
+
+- Ensuring the CI is passing.

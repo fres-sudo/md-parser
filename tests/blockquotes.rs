@@ -24,7 +24,8 @@ fn test_simple_blockquote() {
 
 #[test]
 fn test_multiline_blockquote() {
-    let input = "> First line of blockquote.\n> Second line of blockquote.\n> Third line.".to_string();
+    let input =
+        "> First line of blockquote.\n> Second line of blockquote.\n> Third line.".to_string();
     let mut parser = Parser::new(input).unwrap();
     let result = parser.parse().unwrap();
 
@@ -324,9 +325,12 @@ fn test_blockquote_with_only_whitespace() {
         Node::Blockquote { level, content } => {
             assert_eq!(*level, 1);
             // Whitespace-only content should result in empty or minimal content
-            assert!(content.is_empty() || content.iter().all(|inline| {
-                matches!(inline, Inline::Text { content } if content.trim().is_empty())
-            }));
+            assert!(
+                content.is_empty()
+                    || content.iter().all(|inline| {
+                        matches!(inline, Inline::Text { content } if content.trim().is_empty())
+                    })
+            );
         }
         _ => panic!("Expected Blockquote"),
     }
