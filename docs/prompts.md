@@ -355,3 +355,26 @@ Currenlty there are some tests that do not pass and some other that gives warnin
 **Verification**:
 
 - Ensuring all the tests passes.
+
+### Prompt 34 - Cursor (auto mode)
+
+Can you add support for more complex nested inline elements like a bold text nexted with an italic one? Currently those are not supported in the parser and in the render engine. Can you add this feature and its relative tests?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered nested inline elements.
+- Ensuring new tests passes.
+
+### Prompt 35 - Cursor (auto mode)
+
+Can you add parsing and rendering support for ordered lists as (1. 2. 3., etc...). Add all the necessary tests.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered ordered lists.
+- Ensuring new tests passes.
+
+### Prompt 36 - Cursor (auto mode)
+
