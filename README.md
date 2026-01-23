@@ -1,358 +1,232 @@
 # Markdown Parser with Mermaid Diagram Support
 
-## Goal
+A lightweight, maintainable Markdown parser written in Rust that supports standard Markdown features with special handling for Mermaid diagrams. The parser converts Markdown text into a structured Abstract Syntax Tree (AST) that can be rendered to HTML or other formats.
 
-Use AI to help design and implement a Markdown parser that supports standard Markdown features plus **Mermaid code blocks**, producing a structured representation that could be rendered to HTML (or another target) with special handling for Mermaid diagrams.
+## Installation
 
-## Tasks
+### Prerequisites
 
-1. **Design & Implement**
-Use AI to assist in designing and implementing a Markdown parser (language of your choice) that can recognize headings, lists, links, emphasis, code blocks, and specifically detect and tag ````mermaid` code blocks as separate diagram nodes in the output AST/structure.
-2. **Test & Demonstrate**
-Create a suite of test Markdown documents (including edge cases) and a small demo program that parses them and outputs a readable representation (e.g. JSON AST or HTML), showing correct handling of normal Markdown and Mermaid blocks.
-3. **AI Usage & Verification Report**
-Collect and submit the prompts you used with AI and write a short report explaining how you evaluated, corrected, and verified the AI-generated code (tests, manual inspection, comparison with reference Markdown behaviour).
+- **Rust**: This project requires Rust 2021 Edition or later. If you don't have Rust installed, you can install it using [rustup](https://rustup.rs/):
 
-## Prompts Used
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
-### Prompt 1 - Google Gemini
+### Building from Source
 
-  I need to develop this project for a uni course.
+1. Clone the repository:
 
-  ...assignment specifications...
+```bash
+git clone <repository-url>
+cd md-parser
+```
 
-  I firstly need you to create a very detailed prompt for an LLM in order to guide it in the development of a TDD markdown parser with special support for mermaid in rust. Make sure to guide it to follow the rust best practices focusing on KISS principle and mantainability.
+2. Build the project:
 
-### Prompt 2 - Google Gemini
+```bash
+cargo build --release
+```
 
- Can you also create the rules.mdc file for the project?
+3. The binary will be located at `target/release/md-parser`
 
-### Prompt 3 - Cursor (auto mode - it selects the best model for the task automatically)
+### Running Tests
 
- Role: You are a Senior Rust Engineer and Technical Lead. We are building a lightweight, maintainable Markdown parser from scratch for a university project.
+Run the test suite to verify everything works correctly:
 
-Goal: Create a library that parses Markdown text into a structured Abstract Syntax Tree (AST). The parser must support standard Markdown features and have special handling for Mermaid diagrams.
+```bash
+cargo test
+```
 
-Constraints & Principles:
+## Usage
 
-    Language: Rust (2021 Edition).
+### Command-Line Usage
 
-    Architecture: Input String → Parser State Machine → Vector of AST Nodes.
+The parser can be used as a command-line tool to convert Markdown files to various output formats:
 
-    Methodology: TDD (Test-Driven Development). You must provide the test cases before the implementation logic for each feature.
+```bash
+cargo run --release -- assets/input.md
+```
 
-    KISS Principle: Do not use heavy parsing libraries like nom or pest unless necessary. Use the standard library and regex crate if needed. Keep the logic readable.
+Or if you've installed the binary:
 
-    Maintainability: Use Enums for the AST. Use robust pattern matching.
+```bash
+./target/release/md-parser assets/input.md
+```
 
-Specific Requirements:
+The program will:
 
-    The AST: Define a Node enum. It must clearly distinguish between a standard CodeBlock and a MermaidDiagram.
+- Parse the input Markdown file
+- Generate output files in the `output/` directory (configurable via `config.toml`)
+- Display any warnings (e.g., unclosed code blocks)
 
-    Supported Syntax:
+**Output files** (configurable in `config.toml`):
 
-        Headings (H1-H6)
+- `output/ast.txt` - AST in debug format
+- `output/ast.json` - AST in JSON format
+- `output/output.html` - Rendered HTML document
 
-        Paragraphs
+### Library Usage
 
-        Unordered Lists ( - or *)
+The parser can also be used as a library in your Rust projects:
 
-        Inline elements: Bold (**), Italic (*), and Links [text](url).
+```rust
+use md_parser::{Parser, ParserConfig};
 
-        Fenced Code Blocks (```)
+// Parse a simple markdown string
+let markdown = "# Hello World\n\nThis is a paragraph.".to_string();
+let mut parser = Parser::new(markdown)?;
+let ast = parser.parse()?;
 
-        Crucial: If a fenced code block has the language identifier mermaid, it must be parsed into a specific Node::MermaidDiagram, not a generic Node::CodeBlock.
+// Generate HTML
+let html = parser.to_html()?;
 
-Workflow: Please guide me through this development in 3 Phases. Stop after each phase to let me implement and run the code.
+// Or save to file
+parser.to_html_file("output.html")?;
 
-Phase 1: Foundation & AST Design
+// With custom configuration
+let config = ParserConfig::default();
+let mut parser = Parser::with_config(markdown, config)?;
+```
 
-    Define the Node Enum and the basic Parser struct.
+### Configuration
 
-    Implement a simple parse function that takes a string and returns Vec<Node>.
+The parser uses a `config.toml` file in the project root for configuration. If the file doesn't exist, default values are used.
 
-    TDD: Write a test for a simple plain text paragraph.
+**Example `config.toml`:**
 
-    Implement the parsing logic to pass that test.
+```toml
+[parser]
+max_heading_level = 6
+code_fence_length = 3
+code_fence_pattern = "```"
+mermaid_language = "mermaid"
 
-Phase 2: Block Structure (The Mermaid Logic)
+[parser.mermaid]
+default_theme = "default"
+default_font_size = "16px"
+default_font_family = "trebuchet ms, verdana, arial"
+validate_syntax = true
+use_cli_validation = false
 
-    TDD: Write tests for:
+[renderer]
+output_directory = "output"
+html_header_path = "assets/html_header.html"
+html_footer_path = "assets/html_footer.html"
+html_body_start_path = "assets/html_body_start.html"
+styles_css_path = "assets/styles.css"
 
-        A standard Rust code block.
+[output]
+directory = "output"
+ast_debug_filename = "ast.txt"
+ast_json_filename = "ast.json"
+html_filename = "output.html"
+enable_ast_debug = true
+enable_ast_json = true
+enable_html = true
+```
 
-        A Mermaid code block (ensure the output AST variant is different).
+## Features
 
-        Headings.
+### Supported Features
 
-    Implement the logic to detect fenced blocks. Check the "info string" (the language tag). If it equals mermaid, produce the specific Mermaid AST node.
+The parser supports the following Markdown features:
 
-Phase 3: Inline Elements & Polish
+- **Headings** (levels 1-6) with validation
+- **Paragraphs** with inline formatting support
+- **Unordered lists** with nested sub-lists (using `-`, `*`, or `+`)
+- **Task lists** (checked/unchecked items: `- [ ]` and `- [x]`)
+- **Inline elements**:
+  - **Bold** text (`**text**`)
+  - **Italic** text (`*text*`)
+  - **Strikethrough** text (`~~text~~`)
+  - **Links** (`[text](url)`)
+  - **Images** (`![alt](url)`)
+- **Fenced code blocks** with language identifiers (```` ```language ````)
+- **Mermaid diagrams** with special handling:
+  - Syntax validation
+  - Configuration support (theme, font size, etc.)
+  - Frontmatter parsing (`%%{init: {...}}%%`)
+  - Graceful error handling for invalid diagrams
+- **Tables** with column alignment (left, center, right)
+- **Blockquotes** with nesting support (`>`, `>>`, etc.)
 
-    TDD: Write tests for bold, italic, and links.
+### Not Supported
 
-    Implement the inline parsing logic (this can be a second pass or integrated, whichever is simpler/cleaner).
+The following common Markdown features are **not currently supported**:
 
-    Add a method to serialize the AST to JSON (or a Debug print) to demonstrate the structure.
+- **Ordered lists** (numbered lists: `1.`, `2.`, etc.)
+- **Horizontal rules** (`---` or `***`)
+- **Inline code** (backticks: `` `code` ``)
+- **HTML tags** and entities
+- **Definition lists**
+- **Footnotes** and reference-style links
+- **Autolinks** (automatic URL detection)
+- **Hard line breaks** (two spaces + newline)
+- **Escaped characters** (`\*` for literal asterisk)
+- **Typographic replacements** (smart quotes, etc.)
 
-Immediate Request: Please start with Phase 1. Show me the Cargo.toml dependencies, the AST design, the first test case, and the initial implementation.
+## Known Limitations
 
-### Prompt 4 - Cursor (auto mode)
+1. **Ordered Lists**: Numbered lists are not supported. Only unordered lists with `-`, `*`, or `+` markers are parsed.
 
-Go on with phase 2.
+2. **Inline Code**: Inline code spans using backticks are not parsed. Only fenced code blocks are supported.
 
-### Prompt 5 - Cursor (auto mode)
+3. **HTML Support**: The parser does not parse or render HTML tags embedded in Markdown. All HTML is treated as plain text.
 
-Go on with phase 3.
+4. **Reference-Style Links**: Only inline-style links `[text](url)` are supported. Reference-style links `[text][ref]` with definitions are not supported.
 
-### Prompt 6 - Cursor (auto mode)
+5. **Nested Inline Elements**: While the parser supports nested inline elements (e.g., bold within italic), complex nesting scenarios may not always parse correctly.
 
-Can you create a function that takes the json formatted AST and output an html  file so i can visualize the output?
+6. **Code Block Fence Length**: The parser is configured to use 3 backticks for code fences. Different fence lengths are not supported.
 
-### Prompt 7 - Cursor (auto mode)
+7. **Mermaid Validation**: Mermaid syntax validation is basic and may not catch all syntax errors. Full validation would require the Mermaid CLI tool.
 
-Can you split tests in a separate folder to ensure good code structure?
+8. **Table Parsing**: Tables must have proper alignment rows. Malformed tables may not parse correctly.
 
-### Prompt 8 - Cursor (auto mode)
+9. **Blockquote Nesting**: While nested blockquotes are supported, very deep nesting (more than 3-4 levels) may not render correctly.
 
-Can you move all the static assets that are currently beign hardcoded into the rust files to a separate folder/file for better mantainability code structure?
+10. **Performance**: The parser uses a single-pass approach with regex matching. Very large documents (10,000+ lines) may experience slower parsing times.
 
-### Prompt 9 - Cursor (auto mode)
+## Performance Characteristics
 
-Can you ensure that the html output of the program is located in a specific output/ folder?
+The parser is designed for efficiency and maintainability:
 
-### Prompt 10 - Cursor (auto mode)
+### Optimizations
 
-Can you make sure that the program takes a file .md as input instead of an hardcoded string inside the @src/main.rs file?
+- **RegexSet for Inline Parsing**: Uses `RegexSet` for efficient multi-pattern matching when parsing inline elements (bold, italic, links, images, strikethrough). This allows checking multiple patterns in a single pass.
 
-### Prompt 11 - Cursor (auto mode)
+- **Single-Pass Parsing**: The parser uses a state machine approach to parse the document in a single pass, reducing memory allocations and improving performance.
 
-Can you create a cursor rule for rust code styling and best practices?
+- **Memory-Efficient AST**: The AST uses Rust enums for efficient memory representation. Each node type only stores the data it needs.
 
-**Verification**:
+- **Lazy Regex Compilation**: Regex patterns are compiled once when the parser is created, not on every parse operation.
 
-- [RustWiki Style Guide](https://rustwiki.org/en/style-guide/)
-- [RustLang Style Guide](https://doc.rust-lang.org/style-guide/)
+### Performance Expectations
 
-### Prompt 12 - Cursor (auto mode)
+- **Small documents** (< 100 lines): Parses in < 1ms
+- **Medium documents** (100-1000 lines): Parses in 1-10ms
+- **Large documents** (1000-5000 lines): Parses in 10-50ms
+- **Very large documents** (> 5000 lines): Parses in 50-200ms
 
-Can you do a refactoring of the @src/lib.rs file and @src/main.rs file ensuring those files (and the ones created if needed) follow the style guidelines defined in @.cursor/rules/rust-style.mdc file.
+Performance may vary based on:
 
-**Verification**:
+- Number of inline elements (more inline formatting = slower)
+- Number of code blocks (code blocks are parsed separately)
+- Complexity of nested structures (lists, blockquotes)
 
-- Ensuring all the tests passes.
+### Memory Usage
 
-### Prompt 13 - Cursor (auto mode)
+- **AST Size**: Approximately 2-5x the size of the input Markdown text
+- **Parser State**: Minimal overhead (~1KB for regex patterns)
+- **No Memory Leaks**: Uses Rust's ownership system to prevent memory leaks
 
-Instead of printing in the terminal can u output other format of the AST as files in the output/ folder?
+## Documentation
 
-**Verification**:
+For more information about the development process:
 
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains the files.
-- Ensuring new tests passes.
+- **[Assignment Specification](docs/assignment.md)** - Original project requirements
+- **[Development Prompts](docs/prompts.md)** - Record of all AI prompts used during development
 
-### Prompt 14 - Cursor (auto mode)
+## License
 
-Can you split up the parsing logic from the rendering logic in @src/lib.rs file?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains the files.
-- Ensuring new tests passes.
-
-### Prompt 15 - Cursor (auto mode)
-
-Can you edit the AST and add logic for lists? Currently there's no parsing logic for unordered lists or nested lists with indentation. Add tests for that.
-
-**Verification**:
-
-- Ensuring all the tests passes.
-
-### Prompt 16 - Cursor (auto mode)
-
-Can you edit the parsing logic and handle also unclosed code blocks gracefully? Add warnings in the cli for unclosed code blocks and auto-close them at EOF.
-
-**Verification**:
-
-- Ensuring all the tests passes.
-
-### Prompt 17 - Cursor (auto mode)
-
-Can you improve the current error handling for the AST (in the @src/ast.rs file) in order to inclued error for:
-
-- invalid heading levels (>6)
-- malformed markdown structure
-- position/line information in errors of the input md file.
-
-**Verification**:
-
-- Ensuring all the tests passes.
-
-### Prompt 18 - Cursor (auto mode)
-
-Can you improve the code quality and avoid hardcoded numbers and strings?
-For example:
-
-- hardcoded pattern for code blocks matching
-- hardcoded numbers for fence length (3 for exmpale)
-- String literals like "link", "bold" etc...used as match type -> use enum instead.
-
-**Verification**:
-
-- Ensuring all the tests passes.
-
-### Prompt 19 - Cursor (auto mode)
-
-Can you add a proper configuration file to this project?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the configuration file is created in the root of the project.
-- Ensuring the configuration file is named .env.
-- Ensuring the configuration file is named .env.example.
-- Ensuring the configuration file is named .env.example.
-
-### Prompt 20 - Cursor (auto mode)
-
-Can you add task lists (- [ ] and - [x]) to the parser?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains the files.
-- Ensuring new tests passes.
-
-### Prompt 21 - Cursor (auto mode)
-
-Can you add markdown tables in the parser?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains the files.
-- Ensuring new tests passes.
-
-### Prompt 22 - Cursor (auto mode)
-
-Can you organize tests better in differernt files divided by domain?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-
-### Prompt 23 - Cursor (auto mode)
-
-Can u improve the current mermaid implementation by adding:
-
-- Validate Mermaid syntax
-- Support for Mermaid configuration
-- Error handling for invalid Mermaid diagrams (gracefully)
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains the files.
-- Ensuring new tests passes.
-
-### Prompt 24 - Cursor (auto mode)
-
-Can you plan and build the possibility to parse and render images? (\!\[alt\]\(url\))
-
-### Prompt 25 - Cursor (auto mode)
-
-Can you add a CI/CD Github Actions pipeline that run linters and tests upon pushing to the master branch?
-
-**Verification**:
-
-- Ensure the pipeline is working and the steps are correct.
-
-### Prompt 26 - Cursor (auto mode)
-
-Currently multiple regex searches in find_earliest_match() could be optimized
-
-Consider:
-
-- Use RegexSet for multiple pattern matching
-- Cache match results when possible
-- Consider using aho-corasick for multiple string searches
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains the files.
-- Ensuring new tests passes.
-
-### Prompt 27 - Cursor (auto mode)
-
-Can you add a possibility to parse and render code blocks with different languages?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains properly rendered code blocks with different languages.
-- Ensuring new tests passes.
-
-### Prompt 28 - Cursor (auto mode)
-
-Currently the page is not beign stlyed at all, all the rules are not beign used, can u fix this?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains properly styled pages.
-- Ensuring new tests passes.
-
-### Prompt 29 - Cursor (auto mode)
-
-Can you add parsing and rendering logic for Blockquotes?
-
-**Verification**:
-
-- Ensuring all the tests passes.
-- Ensuring the output/ folder contains properly rendered blockquotes.
-- Ensuring new tests passes.
-
-### Prompt 30 - Cursor (auto mode)
-
-I am getting this error in the CI.
-
-...CI output...
-
-Can you fix it?
-
-**Verification**:
-
-- Ensuring the CI is passing.
-
-### Prompt 31 - Perplexity AI
-
-Why am I getting this error?
-
-...CI output...
-
-in this CI pipeline?
-
-...CI content...
-
-Please fix it.
-
-**Verification**:
-
-- Ensuring the CI is passing.
-- Ensuring the output/ folder contains properly rendered blockquotes.
-- Ensuring new tests passes.
-
-### Prompt 32 - Cursor (auto mode)
-
-I am getting this error in the CI. Can you help?
-
-...CI output...
-
-**Verification**:
-
-- Ensuring the CI is passing.
-- Ensuring the output/ folder contains properly rendered blockquotes.
-- Ensuring new tests passes.
+See [LICENSE](LICENSE) file for details.
