@@ -157,6 +157,9 @@ pub enum Node {
     /// An unordered list (markers `-`, `*`, `+`) with optional nesting
     #[serde(rename = "unordered_list")]
     UnorderedList { items: Vec<ListItem> },
+    /// An ordered list (numbered items like `1.`, `2.`, `3.`) with optional nesting
+    #[serde(rename = "ordered_list")]
+    OrderedList { items: Vec<ListItem> },
     /// A fenced code block with optional language identifier
     #[serde(rename = "code_block")]
     CodeBlock { lang: Option<String>, code: String },

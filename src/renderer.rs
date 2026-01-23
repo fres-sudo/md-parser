@@ -95,6 +95,14 @@ fn render_node(node: &Node) -> String {
             html.push_str("</ul>");
             html
         }
+        Node::OrderedList { items } => {
+            let mut html = String::from("<ol>");
+            for item in items {
+                html.push_str(&render_list_item(item));
+            }
+            html.push_str("</ol>");
+            html
+        }
         Node::CodeBlock { lang, code } => {
             let lang_class = lang
                 .as_ref()
