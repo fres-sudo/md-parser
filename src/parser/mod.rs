@@ -2,6 +2,7 @@
 
 mod blockquotes;
 mod blocks;
+mod horizontal_rules;
 mod inline;
 mod lists;
 mod mermaid;
@@ -123,6 +124,13 @@ impl Parser {
                     blockquotes::parse_blockquote(&lines, i, &self.config, &self.regex_patterns)?;
                 nodes.push(blockquote_node);
                 i = new_idx;
+                continue;
+            }
+
+            // Check for horizontal rules
+            if horizontal_rules::detect_horizontal_rule(lines[i]) {
+                nodes.push(Node::HorizontalRule);
+                i += 1;
                 continue;
             }
 

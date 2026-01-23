@@ -235,6 +235,7 @@ fn render_node(node: &Node) -> String {
             }
             html
         }
+        Node::HorizontalRule => String::from("<hr>"),
     }
 }
 

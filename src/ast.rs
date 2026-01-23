@@ -195,4 +195,7 @@ pub enum Node {
         /// Parsed inline content (supports bold, italic, links, etc.)
         content: Vec<Inline>,
     },
+    /// A horizontal rule (thematic break) using `---` or `***`
+    #[serde(rename = "horizontal_rule")]
+    HorizontalRule,
 }

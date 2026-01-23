@@ -378,3 +378,16 @@ Can you add parsing and rendering support for ordered lists as (1. 2. 3., etc...
 
 ### Prompt 36 - Cursor (auto mode)
 
+Can you implement horizontal rules (--- or ***) with parsing and render logic as well as tests.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered horizontal rules.
+- Ensuring new tests passes.
+
+### Prompt 37 - Cursor (auto mode)
+
+Can you implement line breaks (\\) with parsing and render logic as well as tests.
+
+**Verification**:
