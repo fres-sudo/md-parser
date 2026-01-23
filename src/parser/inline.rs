@@ -8,6 +8,7 @@ use regex::{Regex, RegexSet};
 pub(super) enum InlineMatchType {
     Image,
     Link,
+    Code,
     Strikethrough,
     Bold,
     Italic,
@@ -20,6 +21,7 @@ pub(super) struct RegexPatterns {
     /// Individual regexes for getting match positions and captures
     image: Regex,
     link: Regex,
+    code: Regex,
     strikethrough: Regex,
     bold: Regex,
     italic: Regex,
@@ -28,10 +30,11 @@ pub(super) struct RegexPatterns {
 impl RegexPatterns {
     /// Compile all regex patterns
     pub(super) fn new() -> Result<Self, ParseError> {
-        // Pattern strings in order: image, link, strikethrough, bold, italic
+        // Pattern strings in order: image, link, code, strikethrough, bold, italic
         let pattern_strings = [
             r"!\[([^\]]*)\]\(([^)]+)\)",    // image
             r"\[([^\]]+)\]\(([^)]+)\)",     // link
+            r"`([^`]+)`",                   // code - backticks with one or more non-backtick chars
             r"~~([^~]+?)~~",                // strikethrough
             r"\*\*((?:[^*]|\*[^*])+?)\*\*", // bold - allows * (for italic) but not ** inside
             r"\*((?:[^*]|\*\*)+)\*", // italic - allows ** (for bold) inside, greedy to match full span
@@ -47,12 +50,14 @@ impl RegexPatterns {
                 .map_err(|e| ParseError::RegexCompilationError(format!("Image regex: {}", e)))?,
             link: Regex::new(pattern_strings[1])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Link regex: {}", e)))?,
-            strikethrough: Regex::new(pattern_strings[2]).map_err(|e| {
+            code: Regex::new(pattern_strings[2])
+                .map_err(|e| ParseError::RegexCompilationError(format!("Code regex: {}", e)))?,
+            strikethrough: Regex::new(pattern_strings[3]).map_err(|e| {
                 ParseError::RegexCompilationError(format!("Strikethrough regex: {}", e))
             })?,
-            bold: Regex::new(pattern_strings[3])
+            bold: Regex::new(pattern_strings[4])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Bold regex: {}", e)))?,
-            italic: Regex::new(pattern_strings[4])
+            italic: Regex::new(pattern_strings[5])
                 .map_err(|e| ParseError::RegexCompilationError(format!("Italic regex: {}", e)))?,
         })
     }
@@ -74,7 +79,7 @@ impl RegexPatterns {
         let mut match_type = None;
         let mut match_range = (0, 0);
 
-        // Check patterns in priority order: image (0), link (1), strikethrough (2), bold (3), italic (4)
+        // Check patterns in priority order: image (0), link (1), code (2), strikethrough (3), bold (4), italic (5)
         // Only check patterns that RegexSet identified as matching
 
         // Check for images (must check before links since images start with !)
@@ -99,8 +104,19 @@ impl RegexPatterns {
             }
         }
 
-        // Check for strikethrough (must check before bold/italic to avoid conflicts)
+        // Check for code (must check before bold/italic to avoid conflicts)
         if matches.matched(2) {
+            if let Some(m) = self.code.find(text) {
+                if m.start() < earliest_pos {
+                    earliest_pos = m.start();
+                    match_type = Some(InlineMatchType::Code);
+                    match_range = (m.start(), m.end());
+                }
+            }
+        }
+
+        // Check for strikethrough (must check before bold/italic to avoid conflicts)
+        if matches.matched(3) {
             if let Some(m) = self.strikethrough.find(text) {
                 if m.start() < earliest_pos {
                     earliest_pos = m.start();
@@ -111,7 +127,7 @@ impl RegexPatterns {
         }
 
         // Check for bold (must check before italic to avoid conflicts)
-        if matches.matched(3) {
+        if matches.matched(4) {
             if let Some(m) = self.bold.find(text) {
                 if m.start() < earliest_pos {
                     earliest_pos = m.start();
@@ -122,7 +138,7 @@ impl RegexPatterns {
         }
 
         // Check for italic (only if not part of bold - check that it's not **)
-        if matches.matched(4) {
+        if matches.matched(5) {
             if let Some(m) = self.italic.find(text) {
                 let start = m.start();
                 let end = m.end();
@@ -341,6 +357,43 @@ impl RegexPatterns {
 
         Ok(&remaining[match_range.1..])
     }
+
+    /// Process a code match and add it to inlines
+    pub(super) fn process_code_match<'a>(
+        &self,
+        remaining: &'a str,
+        match_range: (usize, usize),
+        inlines: &mut Vec<Inline>,
+    ) -> Result<&'a str, ParseError> {
+        // Add text before the code
+        if match_range.0 > 0 {
+            let text_before = &remaining[..match_range.0];
+            if !text_before.is_empty() {
+                inlines.push(Inline::Text {
+                    content: text_before.to_string(),
+                });
+            }
+        }
+
+        let match_text = &remaining[match_range.0..match_range.1];
+        let caps = self.code.captures(match_text).ok_or_else(|| {
+            ParseError::InvalidCaptureError("Failed to capture code groups".to_string())
+        })?;
+
+        let code_content = caps
+            .get(1)
+            .ok_or_else(|| {
+                ParseError::InvalidCaptureError("Failed to capture code content".to_string())
+            })?
+            .as_str();
+
+        // Code content is stored as plain text (no recursive parsing)
+        inlines.push(Inline::Code {
+            content: code_content.to_string(),
+        });
+
+        Ok(&remaining[match_range.1..])
+    }
 }
 
 /// Parse inline elements from a text string
@@ -364,6 +417,9 @@ pub(super) fn parse_inline(
                     &mut inlines,
                     |t| parse_inline(t, regex_patterns),
                 )?,
+                InlineMatchType::Code => {
+                    regex_patterns.process_code_match(remaining, match_range, &mut inlines)?
+                }
                 InlineMatchType::Strikethrough => regex_patterns.process_strikethrough_match(
                     remaining,
                     match_range,

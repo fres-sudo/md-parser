@@ -388,6 +388,21 @@ Can you implement horizontal rules (--- or ***) with parsing and render logic as
 
 ### Prompt 37 - Cursor (auto mode)
 
-Can you implement line breaks (\\) with parsing and render logic as well as tests.
+Can you implement inline code (backticks) parsing and rendering logic as well as tests.
 
 **Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered inline code.
+- Ensuring new tests passes.
+
+### Prompt 38 - Cursor (auto mode)
+
+
+Can you implement reference-style links parsing and rendering logic as well as tests.
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered reference-style links.
+- Ensuring new tests passes.

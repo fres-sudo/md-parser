@@ -43,6 +43,9 @@ fn render_inline(inline: &Inline) -> String {
                 escape_html(alt)
             )
         }
+        Inline::Code { content } => {
+            format!("<code>{}</code>", escape_html(content))
+        }
     }
 }
 

@@ -722,3 +722,278 @@ fn test_simple_italic_no_nesting() {
         _ => panic!("Expected Paragraph"),
     }
 }
+
+// ========== Inline Code Tests ==========
+
+#[test]
+fn test_inline_code_simple() {
+    let input = "This is `code` text.".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 3);
+            assert_eq!(
+                inlines[0],
+                Inline::Text {
+                    content: "This is ".to_string()
+                }
+            );
+            match &inlines[1] {
+                Inline::Code { content } => {
+                    assert_eq!(content, "code");
+                }
+                _ => panic!("Expected Code"),
+            }
+            assert_eq!(
+                inlines[2],
+                Inline::Text {
+                    content: " text.".to_string()
+                }
+            );
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_in_paragraph() {
+    let input = "Use the `println!` macro to print.".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert!(inlines.len() >= 3);
+            let has_code = inlines
+                .iter()
+                .any(|inline| matches!(inline, Inline::Code { content: _ }));
+            assert!(has_code, "Expected Code element");
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_at_start() {
+    let input = "`code` at the start".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert!(inlines.len() >= 2);
+            match &inlines[0] {
+                Inline::Code { content } => {
+                    assert_eq!(content, "code");
+                }
+                _ => panic!("Expected Code at start"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_at_end() {
+    let input = "Text ends with `code`".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert!(inlines.len() >= 2);
+            let last_idx = inlines.len() - 1;
+            match &inlines[last_idx] {
+                Inline::Code { content } => {
+                    assert_eq!(content, "code");
+                }
+                _ => panic!("Expected Code at end"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_with_spaces() {
+    let input = "Code with ` spaces inside ` works".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            let code_inline = inlines
+                .iter()
+                .find(|inline| matches!(inline, Inline::Code { .. }));
+            match code_inline {
+                Some(Inline::Code { content }) => {
+                    assert_eq!(content, " spaces inside ");
+                }
+                _ => panic!("Expected Code element"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_special_chars() {
+    let input = "HTML: `<div>&amp;</div>`".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            let code_inline = inlines
+                .iter()
+                .find(|inline| matches!(inline, Inline::Code { .. }));
+            match code_inline {
+                Some(Inline::Code { content }) => {
+                    assert_eq!(content, "<div>&amp;</div>");
+                }
+                _ => panic!("Expected Code element"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_multiple_inline_code() {
+    let input = "Use `fn` and `let` keywords in Rust.".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            let code_count = inlines
+                .iter()
+                .filter(|inline| matches!(inline, Inline::Code { .. }))
+                .count();
+            assert_eq!(code_count, 2, "Expected 2 Code elements");
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_bold_with_inline_code() {
+    let input = "**Bold with `code` inside**".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Bold { content: bold_inlines } => {
+                    let has_code = bold_inlines
+                        .iter()
+                        .any(|inline| matches!(inline, Inline::Code { .. }));
+                    assert!(has_code, "Expected Code inside Bold");
+                }
+                _ => panic!("Expected Bold"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_italic_with_inline_code() {
+    let input = "*Italic with `code` inside*".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            assert_eq!(inlines.len(), 1);
+            match &inlines[0] {
+                Inline::Italic { content: italic_inlines } => {
+                    let has_code = italic_inlines
+                        .iter()
+                        .any(|inline| matches!(inline, Inline::Code { .. }));
+                    assert!(has_code, "Expected Code inside Italic");
+                }
+                _ => panic!("Expected Italic"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_in_heading() {
+    let input = "# Heading with `code`".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Heading { level, content } => {
+            assert_eq!(*level, 1);
+            let has_code = content
+                .iter()
+                .any(|inline| matches!(inline, Inline::Code { .. }));
+            assert!(has_code, "Expected Code element in heading");
+        }
+        _ => panic!("Expected Heading"),
+    }
+}
+
+#[test]
+fn test_inline_code_in_link() {
+    let input = "Link with [`code`](https://example.com)".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::Paragraph { content: inlines } => {
+            let link_inline = inlines
+                .iter()
+                .find(|inline| matches!(inline, Inline::Link { .. }));
+            match link_inline {
+                Some(Inline::Link { text, .. }) => {
+                    let has_code = text
+                        .iter()
+                        .any(|inline| matches!(inline, Inline::Code { .. }));
+                    assert!(has_code, "Expected Code inside Link text");
+                }
+                _ => panic!("Expected Link element"),
+            }
+        }
+        _ => panic!("Expected Paragraph"),
+    }
+}
+
+#[test]
+fn test_inline_code_in_list() {
+    let input = "- Item with `code` inside".to_string();
+    let mut parser = Parser::new(input).unwrap();
+    let result = parser.parse().unwrap();
+
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        Node::UnorderedList { items } => {
+            assert_eq!(items.len(), 1);
+            let has_code = items[0]
+                .content
+                .iter()
+                .any(|inline| matches!(inline, Inline::Code { .. }));
+            assert!(has_code, "Expected Code element in list item");
+        }
+        _ => panic!("Expected UnorderedList"),
+    }
+}

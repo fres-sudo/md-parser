@@ -101,6 +101,9 @@ pub enum Inline {
     /// Image ![alt](url)
     #[serde(rename = "image")]
     Image { alt: String, url: String },
+    /// Inline code (`code`)
+    #[serde(rename = "code")]
+    Code { content: String },
 }
 
 /// A single item in an unordered list; may contain nested sub-lists.
