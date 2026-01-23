@@ -260,3 +260,37 @@ Can u improve the current mermaid implementation by adding:
 ### Prompt 24 - Cursor (auto mode)
 
 Can you plan and build the possibility to parse and render images? (\!\[alt\]\(url\))
+
+### Prompt 25 - Cursor (auto mode)
+
+Can you add a CI/CD Github Actions pipeline that run linters and tests upon pushing to the master branch?
+
+**Verification**:
+
+- Ensure the pipeline is working and the steps are correct.
+
+### Prompt 26 - Cursor (auto mode)
+
+Currently multiple regex searches in find_earliest_match() could be optimized
+
+Consider:
+
+- Use RegexSet for multiple pattern matching
+- Cache match results when possible
+- Consider using aho-corasick for multiple string searches
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains the files.
+- Ensuring new tests passes.
+
+### Prompt 27 - Cursor (auto mode)
+
+Can you add a possibility to parse and render code blocks with different languages?
+
+**Verification**:
+
+- Ensuring all the tests passes.
+- Ensuring the output/ folder contains properly rendered code blocks with different languages.
+- Ensuring new tests passes.

@@ -4,7 +4,7 @@ use crate::ast::{
     Alignment, Inline, ListItem, MermaidConfig, Node, ParseError, Span, ValidationStatus,
 };
 use crate::config::ParserConfig;
-use regex::Regex;
+use regex::{Regex, RegexSet};
 use std::collections::HashMap;
 
 /// Type of inline element match found during parsing
@@ -18,6 +18,9 @@ enum InlineMatchType {
 
 /// Compiled regex patterns for inline element parsing
 struct RegexPatterns {
+    /// RegexSet for efficient multi-pattern matching
+    set: RegexSet,
+    /// Individual regexes for getting match positions and captures
     image: Regex,
     link: Regex,
     bold: Regex,
