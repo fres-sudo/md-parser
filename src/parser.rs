@@ -131,39 +131,64 @@ impl MermaidValidator {
             theme = Some(theme_match);
         }
 
-        // Extract themeVariables
-        if let Some(tv_start) = init_content.find("themeVariables:") {
-            let tv_content = &init_content[tv_start + "themeVariables:".len()..].trim();
-            if let Some(tv_obj) = Self::extract_object(tv_content) {
-                let mut tv_map = HashMap::new();
+        // Extract themeVariables - search for fontSize/fontFamily in nested themeVariables object
+        if init_content.contains("themeVariables") {
+            // Use a regex that finds fontSize within themeVariables section
+            // Pattern: 'fontSize' followed by colon and quoted value, anywhere after themeVariables
+            if let Ok(re) = Regex::new(r"themeVariables[^}]*'fontSize'\s*:\s*'([^']+)'") {
+                if let Some(caps) = re.captures(init_content) {
+                    if let Some(m) = caps.get(1) {
+                        let fs_val = m.as_str().to_string();
+                        font_size = Some(fs_val.clone());
+                        let mut tv_map = HashMap::new();
+                        tv_map.insert("fontSize".to_string(), fs_val);
+                        theme_variables = Some(tv_map);
+                    }
+                }
+            }
 
-                // Extract fontSize - try both with and without quotes in the extracted object
-                if let Some(fs) = Self::extract_string_value(&tv_obj, "fontSize") {
-                    font_size = Some(fs.clone());
-                    tv_map.insert("fontSize".to_string(), fs);
-                } else {
-                    // Try extracting directly from tv_obj if it's just the value
-                    // This handles cases where the object structure is different
-                    let fs_pattern = Regex::new(r"'fontSize'\s*:\s*'([^']+)'").ok();
-                    if let Some(re) = fs_pattern {
-                        if let Some(caps) = re.captures(&tv_obj) {
-                            if let Some(m) = caps.get(1) {
-                                let fs_val = m.as_str().to_string();
-                                font_size = Some(fs_val.clone());
-                                tv_map.insert("fontSize".to_string(), fs_val);
+            // Fallback: try the original approach with extract_object
+            if font_size.is_none() {
+                if let Some(tv_start) = init_content.find("themeVariables:") {
+                    let tv_section_start = tv_start + "themeVariables:".len();
+                    let tv_content = &init_content[tv_section_start..].trim();
+                    let mut tv_map = HashMap::new();
+
+                    // Try extracting the nested object
+                    if let Some(tv_obj) = Self::extract_object(tv_content) {
+                        if let Some(fs) = Self::extract_string_value(&tv_obj, "fontSize") {
+                            font_size = Some(fs.clone());
+                            tv_map.insert("fontSize".to_string(), fs);
+                        }
+                        if let Some(ff) = Self::extract_string_value(&tv_obj, "fontFamily") {
+                            font_family = Some(ff.clone());
+                            tv_map.insert("fontFamily".to_string(), ff);
+                        }
+                    }
+
+                    // If extract_object failed, try extract_string_value on tv_content
+                    if font_size.is_none() {
+                        if let Some(fs) = Self::extract_string_value(tv_content, "fontSize") {
+                            font_size = Some(fs.clone());
+                            if tv_map.is_empty() {
+                                tv_map.insert("fontSize".to_string(), fs);
                             }
                         }
                     }
-                }
+                    if font_family.is_none() {
+                        if let Some(ff) = Self::extract_string_value(tv_content, "fontFamily") {
+                            font_family = Some(ff.clone());
+                            if let Some(ref mut map) = theme_variables {
+                                map.insert("fontFamily".to_string(), ff);
+                            } else {
+                                tv_map.insert("fontFamily".to_string(), ff);
+                            }
+                        }
+                    }
 
-                // Extract fontFamily
-                if let Some(ff) = Self::extract_string_value(&tv_obj, "fontFamily") {
-                    font_family = Some(ff.clone());
-                    tv_map.insert("fontFamily".to_string(), ff);
-                }
-
-                if !tv_map.is_empty() {
-                    theme_variables = Some(tv_map);
+                    if !tv_map.is_empty() {
+                        theme_variables = Some(tv_map);
+                    }
                 }
             }
         }

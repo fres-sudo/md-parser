@@ -39,7 +39,7 @@ fn test_mermaid_validation_invalid_empty() {
     match &result[0] {
         Node::MermaidDiagram {
             validation_status,
-            warnings,
+            warnings: _,
             ..
         } => match validation_status {
             ValidationStatus::Invalid { errors } => {
@@ -62,7 +62,7 @@ fn test_mermaid_validation_invalid_unmatched_brackets() {
     match &result[0] {
         Node::MermaidDiagram {
             validation_status,
-            warnings,
+            warnings: _,
             ..
         } => {
             match validation_status {
@@ -217,7 +217,7 @@ fn test_mermaid_warnings_preserved() {
     match &result[0] {
         Node::MermaidDiagram {
             validation_status,
-            warnings,
+            warnings: _,
             ..
         } => {
             // Should have warnings about arrow syntax
