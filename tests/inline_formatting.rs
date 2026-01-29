@@ -896,7 +896,9 @@ fn test_bold_with_inline_code() {
         Node::Paragraph { content: inlines } => {
             assert_eq!(inlines.len(), 1);
             match &inlines[0] {
-                Inline::Bold { content: bold_inlines } => {
+                Inline::Bold {
+                    content: bold_inlines,
+                } => {
                     let has_code = bold_inlines
                         .iter()
                         .any(|inline| matches!(inline, Inline::Code { .. }));
@@ -920,7 +922,9 @@ fn test_italic_with_inline_code() {
         Node::Paragraph { content: inlines } => {
             assert_eq!(inlines.len(), 1);
             match &inlines[0] {
-                Inline::Italic { content: italic_inlines } => {
+                Inline::Italic {
+                    content: italic_inlines,
+                } => {
                     let has_code = italic_inlines
                         .iter()
                         .any(|inline| matches!(inline, Inline::Code { .. }));

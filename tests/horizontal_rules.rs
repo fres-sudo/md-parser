@@ -246,13 +246,13 @@ fn test_horizontal_rule_in_complex_document() {
 
     // Should have: Heading, Paragraph, HorizontalRule, Heading, Paragraph, HorizontalRule, UnorderedList
     assert_eq!(result.len(), 7);
-    
+
     // Check first horizontal rule
     match &result[2] {
         Node::HorizontalRule => {}
         _ => panic!("Expected HorizontalRule at position 2"),
     }
-    
+
     // Check second horizontal rule
     match &result[5] {
         Node::HorizontalRule => {}

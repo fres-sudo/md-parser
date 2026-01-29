@@ -16,26 +16,29 @@
 /// - `---text---` (invalid, contains other characters)
 pub(super) fn detect_horizontal_rule(line: &str) -> bool {
     let trimmed = line.trim();
-    
+
     // Must have at least 3 characters
     if trimmed.len() < 3 {
         return false;
     }
-    
+
     // Check if all characters are either `-` or `*`
     // Must have at least 3 consecutive characters of the same type
     let first_char = trimmed.chars().next().unwrap();
-    
+
     // Only `-` and `*` are valid for horizontal rules
     if first_char != '-' && first_char != '*' {
         return false;
     }
-    
+
     // Check that all characters are the same as the first character
     // and there are at least 3 of them
     let count = trimmed.chars().take_while(|&c| c == first_char).count();
-    
-    count >= 3 && trimmed.chars().all(|c| c == first_char || c.is_whitespace())
+
+    count >= 3
+        && trimmed
+            .chars()
+            .all(|c| c == first_char || c.is_whitespace())
 }
 
 #[cfg(test)]
